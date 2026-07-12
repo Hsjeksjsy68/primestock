@@ -1,0 +1,37 @@
+{
+  "collections": [
+    {
+      "collection_name": "users",
+      "description": "Stores user profiles.",
+      "schema": {
+        "email": "string",
+        "role": "string",
+        "createdAt": "timestamp"
+      },
+      "access_rules": {
+        "read": "request.auth != null && request.auth.uid == resource.id",
+        "write": "request.auth != null && request.auth.uid == resource.id"
+      }
+    },
+    {
+      "collection_name": "products",
+      "description": "Stores products for sale.",
+      "schema": {
+        "name": "string",
+        "price": "number",
+        "category": "string",
+        "rating": "number",
+        "reviews": "number",
+        "image": "string",
+        "sellerId": "string",
+        "sellerName": "string",
+        "stock": "number",
+        "createdAt": "timestamp"
+      },
+      "access_rules": {
+        "read": "true",
+        "write": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller' && request.resource.data.sellerId == request.auth.uid"
+      }
+    }
+  ]
+}

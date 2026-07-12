@@ -1,0 +1,6 @@
+{
+  "name": "Prime Stock",
+  "description": "An e-commerce platform for buyers and sellers",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
