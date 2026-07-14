@@ -87,6 +87,8 @@ import CustomerService from "./CustomerService";
 import Deals from "./Deals";
 import GiftCards from "./GiftCards";
 import Registry from "./Registry";
+import UserProfile from "./UserProfile";
+import BestSellers from "./BestSellers";
 
 import {
   collection,
@@ -147,7 +149,11 @@ export default function App() {
           (docSnap) => {
             if (docSnap.exists()) {
               const data = docSnap.data() as UserDoc;
-              setUserRole(data.role);
+              if (currentUser.email === "admin-001@primestock.com") {
+                setUserRole("admin");
+              } else {
+                setUserRole(data.role);
+              }
               setSellerProfile(data.sellerProfile || null);
             }
           },
@@ -312,6 +318,14 @@ export default function App() {
                     {userRole === "seller" ? "SELLER ACCOUNT" : "ACCOUNT"}
                   </button>
                   <div className="absolute top-full left-0 mt-4 bg-black border-2 border-neutral-800 hidden group-hover:block z-50 w-48 shadow-xl">
+                    {userRole === "admin" && (
+                      <button
+                        onClick={() => setCurrentView("admin")}
+                        className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[#D4FF00] hover:text-black transition-colors"
+                      >
+                        Admin Dashboard
+                      </button>
+                    )}
                     {userRole === "seller" && (
                       <button
                         onClick={() => setCurrentView("seller")}
@@ -320,6 +334,12 @@ export default function App() {
                         Dashboard
                       </button>
                     )}
+                    <button
+                      onClick={() => setCurrentView("profile")}
+                      className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[#D4FF00] hover:text-black transition-colors"
+                    >
+                      My Profile
+                    </button>
                     <button
                       onClick={() => signOut(auth)}
                       className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-red-500 transition-colors flex items-center gap-2"
@@ -346,10 +366,11 @@ export default function App() {
               setActiveCategory("ALL");
               setSearchQuery("");
             }}
-            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 text-xl md:text-2xl font-black tracking-tighter hover:opacity-80 transition-opacity uppercase"
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 md:gap-2 text-xl md:text-2xl font-black tracking-tighter hover:opacity-80 transition-opacity uppercase"
           >
             <div className="w-0 h-0 border-t-[8px] md:border-t-[10px] border-t-transparent border-l-[12px] md:border-l-[15px] border-l-white border-b-[8px] md:border-b-[10px] border-b-transparent"></div>
-            PRIME STOCK
+            <span className="hidden sm:inline">PRIME STOCK</span>
+            <span className="sm:hidden">P.S.</span>
           </button>
 
           {/* Right: Actions */}
@@ -361,7 +382,7 @@ export default function App() {
                 placeholder="SEARCH"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border border-neutral-700 focus:border-white text-white uppercase tracking-widest text-xs font-bold py-2 pl-10 pr-4 w-32 md:w-48 transition-colors outline-none"
+                className="bg-transparent border border-neutral-700 focus:border-white text-white uppercase tracking-widest text-xs font-bold py-2 pl-10 pr-2 md:pr-4 w-24 sm:w-32 md:w-48 transition-all outline-none focus:w-32 sm:focus:w-40 md:focus:w-64"
               />
             </div>
             <button
@@ -1318,7 +1339,7 @@ export default function App() {
           </div>
           <button
             onClick={() => {
-              setCurrentView("home");
+              setCurrentView("best-sellers");
               setIsMenuOpen(false);
             }}
             className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 hover:text-[#D4FF00] transition-colors"
