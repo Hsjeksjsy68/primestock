@@ -29,6 +29,7 @@ interface SellerProfile {
 interface UserDoc {
   role: string;
   email: string;
+  address?: string;
   sellerProfile?: SellerProfile;
 }
 
@@ -117,6 +118,7 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userAddress, setUserAddress] = useState<string>('');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -124,9 +126,10 @@ export default function App() {
     null,
   );
   const [orders, setOrders] = useState<Order[]>([]);
-  const [activeTab, setActiveTab] = useState<"inventory" | "orders">(
+  const [activeTab, setActiveTab] = useState<"inventory" | "orders" | "support">(
     "inventory",
   );
+  const [supportRequests, setSupportRequests] = useState<any[]>([]);
   const [successModal, setSuccessModal] = useState({
     isOpen: false,
     message: "",
@@ -154,6 +157,7 @@ export default function App() {
               } else {
                 setUserRole(data.role);
               }
+              setUserAddress(data.address || '');
               setSellerProfile(data.sellerProfile || null);
             }
           },
@@ -175,6 +179,17 @@ export default function App() {
       },
     );
 
+    const unsubscribeSupport = onSnapshot(
+      collection(db, "support_requests"),
+      (snapshot) => {
+        const fbReqs: any[] = [];
+        snapshot.forEach((doc) => {
+          fbReqs.push({ id: doc.id, ...doc.data() });
+        });
+        setSupportRequests(fbReqs);
+      }
+    );
+
     const unsubscribeProducts = onSnapshot(
       collection(db, "products"),
       (snapshot) => {
@@ -191,6 +206,7 @@ export default function App() {
       if (unsubscribeDoc) unsubscribeDoc();
       unsubscribeOrders();
       unsubscribeProducts();
+      unsubscribeSupport();
     };
   }, []);
 
@@ -200,10 +216,15 @@ export default function App() {
       return;
     }
     if (cart.length === 0) return;
+    if (!userAddress) {
+      setSuccessModal({ isOpen: true, message: "Please add a shipping address in your profile first." });
+      return;
+    }
     try {
       await addDoc(collection(db, "orders"), {
         userId: user.uid,
         userEmail: user.email,
+        shippingAddress: userAddress,
         items: cart,
         total: cartTotal * 1.08,
         status: "pending",
@@ -313,41 +334,16 @@ export default function App() {
                 Campaign
               </button>
               {user ? (
-                <div className="relative group">
-                  <button className="hover:text-[#D4FF00] transition-colors uppercase">
-                    {userRole === "seller" ? "SELLER ACCOUNT" : "ACCOUNT"}
-                  </button>
-                  <div className="absolute top-full left-0 mt-4 bg-black border-2 border-neutral-800 hidden group-hover:block z-50 w-48 shadow-xl">
-                    {userRole === "admin" && (
-                      <button
-                        onClick={() => setCurrentView("admin")}
-                        className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[#D4FF00] hover:text-black transition-colors"
-                      >
-                        Admin Dashboard
-                      </button>
-                    )}
-                    {userRole === "seller" && (
-                      <button
-                        onClick={() => setCurrentView("seller")}
-                        className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[#D4FF00] hover:text-black transition-colors"
-                      >
-                        Dashboard
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setCurrentView("profile")}
-                      className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-[#D4FF00] hover:text-black transition-colors"
-                    >
-                      My Profile
-                    </button>
-                    <button
-                      onClick={() => signOut(auth)}
-                      className="w-full text-left px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-red-500 transition-colors flex items-center gap-2"
-                    >
-                      <LogOut className="w-4 h-4" /> Sign Out
-                    </button>
-                  </div>
-                </div>
+                <button
+                  onClick={() => {
+                    if (userRole === "admin") setCurrentView("admin");
+                    else if (userRole === "seller") setCurrentView("seller");
+                    else setCurrentView("profile");
+                  }}
+                  className="hover:text-[#D4FF00] transition-colors uppercase"
+                >
+                  {userRole === "admin" ? "ADMIN" : userRole === "seller" ? "SELLER DASH" : "PROFILE"}
+                </button>
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
@@ -366,11 +362,10 @@ export default function App() {
               setActiveCategory("ALL");
               setSearchQuery("");
             }}
-            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 md:gap-2 text-xl md:text-2xl font-black tracking-tighter hover:opacity-80 transition-opacity uppercase"
+            className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 text-xl md:text-2xl font-black tracking-tighter hover:opacity-80 transition-opacity uppercase"
           >
             <div className="w-0 h-0 border-t-[8px] md:border-t-[10px] border-t-transparent border-l-[12px] md:border-l-[15px] border-l-white border-b-[8px] md:border-b-[10px] border-b-transparent"></div>
-            <span className="hidden sm:inline">PRIME STOCK</span>
-            <span className="sm:hidden">P.S.</span>
+            PRIME STOCK
           </button>
 
           {/* Right: Actions */}
@@ -382,7 +377,7 @@ export default function App() {
                 placeholder="SEARCH"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border border-neutral-700 focus:border-white text-white uppercase tracking-widest text-xs font-bold py-2 pl-10 pr-2 md:pr-4 w-24 sm:w-32 md:w-48 transition-all outline-none focus:w-32 sm:focus:w-40 md:focus:w-64"
+                className="bg-transparent border border-transparent sm:border-neutral-700 focus:border-white text-white uppercase tracking-widest text-xs font-bold py-2 pl-10 pr-2 md:pr-4 w-10 sm:w-32 md:w-48 transition-all outline-none focus:w-40 md:focus:w-64 cursor-pointer focus:cursor-text"
               />
             </div>
             <button
@@ -957,6 +952,23 @@ export default function App() {
                     </div>
                   </div>
 
+                  {user && (
+                    <div className="bg-neutral-900 border border-neutral-800 p-4 mb-6">
+                      <h4 className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Shipping To</h4>
+                      {userAddress ? (
+                        <p className="text-white text-sm font-mono whitespace-pre-wrap">{userAddress}</p>
+                      ) : (
+                        <div className="text-red-400 text-sm font-bold uppercase mb-2">No address set</div>
+                      )}
+                      <button 
+                        onClick={() => setCurrentView("profile")}
+                        className="text-[#D4FF00] hover:underline uppercase tracking-widest text-xs font-black mt-2 inline-block"
+                      >
+                        {userAddress ? 'Change Address' : 'Add Address in Profile'}
+                      </button>
+                    </div>
+                  )}
+
                   <button
                     onClick={placeOrder}
                     className="w-full bg-[#D4FF00] hover:bg-white text-black font-black py-4 px-4 uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
@@ -1012,9 +1024,15 @@ export default function App() {
                   >
                     Orders
                   </button>
+                  <button
+                    onClick={() => setActiveTab("support")}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "support" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                  >
+                    Support
+                  </button>
                 </div>
                 <div className="p-6 sm:p-8">
-                  {activeTab === "inventory" ? (
+                  {activeTab === "inventory" && (
                     <>
                       {/* Stats */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
@@ -1152,7 +1170,8 @@ export default function App() {
                         </div>
                       </div>
                     </>
-                  ) : (
+                  )}
+                  {activeTab === "orders" && (
                     <div className="animate-in fade-in duration-300">
                       <h2 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">
                         ORDER HISTORY
@@ -1263,6 +1282,41 @@ export default function App() {
                       )}
                     </div>
                   )}
+                  {activeTab === "support" && (
+                    <div className="animate-in fade-in duration-300">
+                      <h2 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">
+                        CUSTOMER SUPPORT REQUESTS
+                      </h2>
+                      {supportRequests.filter(req => req.sellerIds && req.sellerIds.includes(user?.uid)).length === 0 ? (
+                        <div className="bg-black border-2 border-neutral-800 p-12 text-center">
+                          <p className="text-neutral-500 font-bold uppercase tracking-widest text-sm mb-2">No support requests.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {supportRequests.filter(req => req.sellerIds && req.sellerIds.includes(user?.uid)).map(req => (
+                            <div key={req.id} className="border border-neutral-800 p-6 bg-neutral-900">
+                              <div className="flex justify-between items-start mb-4 border-b border-neutral-800 pb-4">
+                                <div>
+                                  <span className="bg-[#D4FF00] text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 mb-2 inline-block">
+                                    {req.type.replace('_', ' ')}
+                                  </span>
+                                  <h3 className="text-white font-bold">{req.userEmail}</h3>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-xs text-neutral-500 font-black uppercase tracking-widest mb-1">ORDER ID</div>
+                                  <div className="text-white font-mono text-sm">{req.orderId || 'N/A'}</div>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <p><strong className="text-neutral-400">Reason:</strong> <span className="text-white">{req.reason}</span></p>
+                                <p><strong className="text-neutral-400">Details:</strong> <span className="text-neutral-300">{req.details}</span></p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1271,7 +1325,17 @@ export default function App() {
 
         {currentView === "customer-service" && <CustomerService />}
         {currentView === "admin" && <AdminDashboard />}
-        {["deals", "registry", "gift-cards"].includes(currentView) && (
+        {currentView === "gift-cards" && <GiftCards user={user} />}
+        {currentView === "deals" && <Deals products={products} onViewProduct={(id) => {
+          setSelectedProductId(id);
+          setCurrentView("product");
+        }} />}
+        {currentView === "best-sellers" && <BestSellers products={products} onViewProduct={(id) => {
+          setSelectedProductId(id);
+          setCurrentView("product");
+        }} />}
+        {currentView === "registry" && <Registry />}
+        {["deals", "registry"].includes(currentView) && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center animate-in fade-in duration-500">
             <div className="w-24 h-24 border-2 border-[#D4FF00] flex items-center justify-center mb-8">
               <Star className="w-10 h-10 text-[#D4FF00]" />

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
 export default function CustomerService() {
@@ -20,10 +20,27 @@ export default function CustomerService() {
     setError('');
     try {
       if (!auth.currentUser) throw new Error("Please log in to submit a request.");
+      
+      let targetSellerIds = [];
+      if (formData.type === 'return' && formData.orderId) {
+        try {
+          const orderDoc = await getDoc(doc(db, 'orders', formData.orderId));
+          if (orderDoc.exists()) {
+            const orderData = orderDoc.data();
+            targetSellerIds = [...new Set(orderData.items.map((item) => item.product.sellerId).filter(Boolean))];
+          } else {
+            throw new Error("Order ID not found.");
+          }
+        } catch (e) {
+          throw new Error("Could not find order to route to seller.");
+        }
+      }
+
       await addDoc(collection(db, 'support_requests'), {
         ...formData,
         userId: auth.currentUser.uid,
         userEmail: auth.currentUser.email,
+        sellerIds: targetSellerIds,
         status: 'open',
         createdAt: new Date().toISOString()
       });

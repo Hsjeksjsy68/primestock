@@ -1,7 +1,9 @@
 import React from 'react';
 import { Package, Heart, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, db } from './firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
 
 export default function UserProfile({ 
   user,
@@ -36,6 +38,50 @@ export default function UserProfile({
         >
           <LogOut className="w-4 h-4" /> Sign Out
         </button>
+      </div>
+
+      <div className="bg-black border-2 border-neutral-800 p-8 mb-12">
+        <h2 className="text-2xl font-black uppercase text-white mb-4">SHIPPING ADDRESS</h2>
+        {isEditingAddress ? (
+          <div className="space-y-4">
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              className="w-full bg-neutral-900 border border-neutral-800 text-white p-4 focus:border-[#D4FF00] outline-none min-h-[100px]"
+              placeholder="Enter your full shipping address..."
+            />
+            <div className="flex gap-4">
+              <button 
+                onClick={saveAddress}
+                disabled={isSaving}
+                className="bg-[#D4FF00] text-black font-black uppercase tracking-widest px-6 py-3 hover:bg-white transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'SAVING...' : 'SAVE ADDRESS'}
+              </button>
+              <button 
+                onClick={() => setIsEditingAddress(false)}
+                disabled={isSaving}
+                className="text-neutral-500 font-bold uppercase tracking-widest px-6 py-3 hover:text-white transition-colors"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {address ? (
+              <p className="text-neutral-300 whitespace-pre-wrap font-mono mb-4">{address}</p>
+            ) : (
+              <p className="text-neutral-500 italic mb-4">No address saved yet. Save an address for faster checkout.</p>
+            )}
+            <button 
+              onClick={() => setIsEditingAddress(true)}
+              className="border-2 border-[#D4FF00] text-[#D4FF00] font-black uppercase tracking-widest px-6 py-2 hover:bg-[#D4FF00] hover:text-black transition-colors text-xs"
+            >
+              {address ? 'EDIT ADDRESS' : 'ADD ADDRESS'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
