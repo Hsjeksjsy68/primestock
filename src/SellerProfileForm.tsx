@@ -28,7 +28,10 @@ export default function SellerProfileForm({ onComplete }: { onComplete: () => vo
       if (!auth.currentUser) throw new Error("Not authenticated");
       const userRef = doc(db, 'users', auth.currentUser.uid);
       await updateDoc(userRef, {
-        sellerProfile: formData
+        sellerProfile: {
+          ...formData,
+          status: 'pending'
+        }
       });
       onComplete();
     } catch (err: any) {

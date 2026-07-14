@@ -16,6 +16,7 @@ interface Product {
 }
 
 interface SellerProfile {
+  status?: string;
   tradeLicense: string;
   nid: string;
   phone: string;
@@ -70,6 +71,7 @@ import {
   User,
   ArrowRight,
   ArrowUpRight,
+  Share2,
 } from "lucide-react";
 import AuthModal from "./AuthModal";
 import { auth, db } from "./firebase";
@@ -80,7 +82,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 import AddProductModal from "./AddProductModal";
 import ConfirmModal from "./ConfirmModal";
 import SellerProfileForm from "./SellerProfileForm";
+import AdminDashboard from "./AdminDashboard";
 import CustomerService from "./CustomerService";
+import Deals from "./Deals";
+import GiftCards from "./GiftCards";
+import Registry from "./Registry";
 
 import {
   collection,
@@ -768,12 +774,24 @@ export default function App() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => addToCart(selectedProduct)}
-                  className="bg-[#D4FF00] hover:bg-white text-black font-black uppercase tracking-widest py-5 px-8 transition-colors flex items-center justify-center gap-3 border-2 border-transparent w-full"
-                >
-                  ADD TO CART <Plus className="w-5 h-5" />
-                </button>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => addToCart(selectedProduct)}
+                    className="flex-1 bg-[#D4FF00] hover:bg-white text-black font-black uppercase tracking-widest py-5 px-8 transition-colors flex items-center justify-center gap-3 border-2 border-transparent"
+                  >
+                    ADD TO CART <Plus className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.origin + '/product/' + selectedProduct.id);
+                      alert('Product link copied to clipboard!');
+                    }}
+                    className="bg-neutral-900 hover:bg-neutral-800 text-white font-black uppercase tracking-widest py-5 px-6 transition-colors border border-neutral-800 flex items-center justify-center"
+                    title="Share Product"
+                  >
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -935,6 +953,11 @@ export default function App() {
           <div className="max-w-6xl mx-auto animate-in slide-in-from-right-8 duration-300">
             {!sellerProfile ? (
               <SellerProfileForm onComplete={() => window.location.reload()} />
+            ) : sellerProfile.status === 'pending' ? (
+              <div className="bg-black border-2 border-neutral-800 p-12 text-center">
+                <h2 className="text-3xl font-black uppercase text-[#D4FF00] mb-4">Application Pending</h2>
+                <p className="text-white font-bold uppercase tracking-widest text-sm">Your seller application is currently under review by our administration. We will notify you once approved.</p>
+              </div>
             ) : (
               <div className="bg-black border-2 border-neutral-800 overflow-hidden rounded-none">
                 {/* Dashboard Header */}
@@ -1226,6 +1249,7 @@ export default function App() {
         )}
 
         {currentView === "customer-service" && <CustomerService />}
+        {currentView === "admin" && <AdminDashboard />}
         {["deals", "registry", "gift-cards"].includes(currentView) && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center animate-in fade-in duration-500">
             <div className="w-24 h-24 border-2 border-[#D4FF00] flex items-center justify-center mb-8">
@@ -1400,12 +1424,8 @@ export default function App() {
           <button
             onClick={() => {
               if (user) {
-                if (userRole === "seller") {
-                  setCurrentView("seller");
-                  setIsMenuOpen(false);
-                } else {
-                  alert("You need a seller account to access this.");
-                }
+                setCurrentView("seller");
+                setIsMenuOpen(false);
               } else {
                 setIsAuthModalOpen(true);
                 setIsMenuOpen(false);
@@ -1413,7 +1433,7 @@ export default function App() {
             }}
             className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 hover:text-[#D4FF00] transition-colors"
           >
-            Seller Dashboard
+            {userRole === 'seller' ? 'Seller Dashboard' : 'Become a Seller'}
           </button>
           <button
             onClick={() => {
