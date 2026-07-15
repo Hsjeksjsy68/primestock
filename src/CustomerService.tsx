@@ -21,13 +21,13 @@ export default function CustomerService() {
     try {
       if (!auth.currentUser) throw new Error("Please log in to submit a request.");
       
-      let targetSellerIds = [];
+      let targetSellerIds: string[] = [];
       if (formData.type === 'return' && formData.orderId) {
         try {
           const orderDoc = await getDoc(doc(db, 'orders', formData.orderId));
           if (orderDoc.exists()) {
             const orderData = orderDoc.data();
-            targetSellerIds = [...new Set(orderData.items.map((item) => item.product.sellerId).filter(Boolean))];
+            targetSellerIds = [...new Set(orderData.items.map((item: any) => item.product.sellerId).filter(Boolean))] as string[];
           } else {
             throw new Error("Order ID not found.");
           }

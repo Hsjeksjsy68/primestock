@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import { Package, Heart, LogOut, Save } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth, db } from './firebase';

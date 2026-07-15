@@ -13,6 +13,10 @@ interface Product {
   deliveryAvailable?: boolean;
   sizes?: string[];
   description?: string;
+  stock?: number;
+  sku?: string;
+  brand?: string;
+  shippingFee?: number;
 }
 
 interface SellerProfile {
@@ -72,7 +76,6 @@ import {
   BarChart3,
   CheckCircle,
   X,
-  LogOut,
   User,
   ArrowRight,
   ArrowUpRight,
@@ -84,7 +87,8 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import { useNavigate, useLocation } from "react-router-dom";
 
-import AddProductModal from "./AddProductModal";
+import AddListing from "./AddListing";
+import UserProfile from "./UserProfile";
 import ConfirmModal from "./ConfirmModal";
 import SellerProfileForm from "./SellerProfileForm";
 import AdminDashboard from "./AdminDashboard";
@@ -92,7 +96,6 @@ import CustomerService from "./CustomerService";
 import Deals from "./Deals";
 import GiftCards from "./GiftCards";
 import Registry from "./Registry";
-import UserProfile from "./UserProfile";
 import BestSellers from "./BestSellers";
 
 import {
@@ -124,7 +127,6 @@ export default function App() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userAddress, setUserAddress] = useState<string>('');
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(
     null,
@@ -592,7 +594,7 @@ export default function App() {
                       <div className="flex items-end justify-between mt-auto">
                         <div className="flex flex-col">
                           <span className="text-xl font-black text-white">
-                            ৳${product.price.toFixed(2)}
+                            ৳{product.price.toFixed(2)}
                           </span>
                         </div>
                         <button
@@ -731,7 +733,7 @@ export default function App() {
                         <div className="flex items-end justify-between mt-auto">
                           <div className="flex flex-col">
                             <span className="text-xl font-black text-white">
-                              ৳${product.price.toFixed(2)}
+                              ৳{product.price.toFixed(2)}
                             </span>
                           </div>
                           <button
@@ -802,7 +804,7 @@ export default function App() {
                   {selectedProduct.name}
                 </h1>
                 <p className="text-3xl font-black text-white mb-8">
-                  ৳${selectedProduct.price.toFixed(2)}
+                  ৳{selectedProduct.price.toFixed(2)}
                 </p>
                 <div className="prose prose-invert max-w-none text-neutral-400 font-medium mb-10">
                   <p>
@@ -810,18 +812,30 @@ export default function App() {
                       "Engineered for precision and built to last. This piece represents our commitment to brutalist aesthetics combined with uncompromising functionality."}
                   </p>
                   <ul className="mt-4 uppercase tracking-widest text-xs space-y-2">
+                    {selectedProduct.brand && (
+                      <li>
+                        &bull; BRAND: <span className="text-white">{selectedProduct.brand}</span>
+                      </li>
+                    )}
+                    {selectedProduct.sku && (
+                      <li>
+                        &bull; SKU: <span className="text-white">{selectedProduct.sku}</span>
+                      </li>
+                    )}
                     {selectedProduct.sizes &&
                       selectedProduct.sizes.length > 0 && (
                         <li>
-                          &bull; SIZES: {selectedProduct.sizes.join(", ")}
+                          &bull; SIZES: <span className="text-white">{selectedProduct.sizes.join(", ")}</span>
                         </li>
                       )}
                     <li>
-                      &bull; DELIVERY:{" "}
-                      {selectedProduct.deliveryAvailable
-                        ? "AVAILABLE"
-                        : "NOT AVAILABLE"}
+                      &bull; STOCK: <span className="text-white">{selectedProduct.stock !== undefined ? selectedProduct.stock : 'IN STOCK'}</span>
                     </li>
+                    {selectedProduct.deliveryAvailable !== false && (
+                      <li>
+                        &bull; DELIVERY: <span className="text-white">AVAILABLE</span> {selectedProduct.shippingFee ? `(৳{selectedProduct.shippingFee.toFixed(2)})` : ''}
+                      </li>
+                    )}
                     <li>&bull; SELLER: {selectedProduct.seller}</li>
                   </ul>
                 </div>
@@ -917,7 +931,7 @@ export default function App() {
                             </p>
                           </div>
                           <span className="font-bold text-lg whitespace-nowrap">
-                            ৳${(item.product.price * item.quantity).toFixed(2)}
+                            ৳{(item.product.price * item.quantity).toFixed(2)}
                           </span>
                         </div>
 
@@ -969,7 +983,7 @@ export default function App() {
                     <div className="flex justify-between">
                       <span>Items ({cartItemCount}):</span>
                       <span className="text-neutral-200">
-                        ৳${cartTotal.toFixed(2)}
+                        ৳{cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -979,13 +993,13 @@ export default function App() {
                     <div className="flex justify-between">
                       <span>Total before tax:</span>
                       <span className="text-neutral-200">
-                        ৳${cartTotal.toFixed(2)}
+                        ৳{cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Estimated tax (8%):</span>
                       <span className="text-neutral-200">
-                        ৳${(cartTotal * 0.08).toFixed(2)}
+                        ৳{(cartTotal * 0.08).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -996,7 +1010,7 @@ export default function App() {
                         Order Total:
                       </span>
                       <span className="font-black text-2xl text-neutral-100">
-                        ৳${(cartTotal * 1.08).toFixed(2)}
+                        ৳{(cartTotal * 1.08).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1053,7 +1067,7 @@ export default function App() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setIsAddProductModalOpen(true)}
+                    onClick={() => setCurrentView("add-listing")}
                     className="bg-black hover:bg-neutral-800 text-white font-black py-4 px-6 uppercase tracking-widest transition-colors flex items-center gap-2 border-2 border-black"
                   >
                     <Plus className="w-5 h-5" /> ADD LISTING
@@ -1194,7 +1208,7 @@ export default function App() {
                                       PRM-{(1000 + i).toString()}
                                     </td>
                                     <td className="px-6 py-4 font-black text-white">
-                                      ৳${p.price.toFixed(2)}
+                                      ৳{p.price.toFixed(2)}
                                     </td>
                                     <td className="px-6 py-4 text-white font-bold">
                                       {Math.floor(Math.random() * 50) + 5} UNITS
@@ -1395,6 +1409,8 @@ export default function App() {
         )}
 
         {currentView === "customer-service" && <CustomerService />}
+        {currentView === "profile" && <UserProfile user={user} orders={orders} favorites={favorites} products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} />}
+        {currentView === "add-listing" && <AddListing onBack={() => setCurrentView("seller")} />}
         {currentView === "admin" && <AdminDashboard />}
         {currentView === "gift-cards" && <GiftCards user={user} />}
         {currentView === "deals" && <Deals />}
@@ -1440,9 +1456,15 @@ export default function App() {
               <User className="w-5 h-5 text-white" />
             </div>
             {user ? (
-              <span className="font-bold text-white text-lg truncate max-w-[200px]">
+              <button 
+                onClick={() => {
+                  setCurrentView("profile");
+                  setIsMenuOpen(false);
+                }}
+                className="font-bold text-white text-lg truncate max-w-[200px] hover:text-[#D4FF00] transition-colors"
+              >
                 Hello, {user.email?.split("@")[0]}
-              </span>
+              </button>
             ) : (
               <button
                 onClick={() => {
@@ -1611,10 +1633,6 @@ export default function App() {
       {isAuthModalOpen && (
         <AuthModal onClose={() => setIsAuthModalOpen(false)} />
       )}
-      <AddProductModal
-        isOpen={isAddProductModalOpen}
-        onClose={() => setIsAddProductModalOpen(false)}
-      />
       <ConfirmModal
         isOpen={deleteConfirm !== null}
         title="Delete Listing"
