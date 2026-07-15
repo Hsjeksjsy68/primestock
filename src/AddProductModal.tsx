@@ -113,18 +113,30 @@ export default function AddProductModal({ isOpen, onClose }: { isOpen: boolean, 
           </div>
           
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">IMAGE URL</label>
+            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRODUCT IMAGE</label>
             <div className="relative">
-              <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
               <input 
-                type="url" 
+                type="file" 
+                accept="image/*"
                 required
-                value={image}
-                onChange={(e) => setImage(e.target.value)}
-                placeholder="https://..."
-                className="w-full bg-black border border-neutral-800 text-white pl-12 pr-4 py-3 focus:border-[#D4FF00] outline-none transition-colors"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setImage(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+                className="w-full bg-black border border-neutral-800 text-neutral-400 px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-black file:uppercase file:tracking-widest file:bg-[#D4FF00] file:text-black hover:file:bg-white"
               />
             </div>
+            {image && (
+              <div className="mt-4 aspect-video w-32 bg-neutral-800 relative">
+                <img src={image} alt="Preview" className="w-full h-full object-cover" />
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">DESCRIPTION</label>

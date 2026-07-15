@@ -36,6 +36,10 @@ interface UserDoc {
 interface Order {
   id: string;
   userId: string;
+  userEmail: string;
+  customerName?: string;
+  customerPhone?: string;
+  shippingAddress?: string;
   items: CartItem[];
   total: number;
   status: string;
@@ -94,7 +98,7 @@ import BestSellers from "./BestSellers";
 import {
   collection,
   doc,
-  deleteDoc,
+  deleteDoc, getDoc,
   onSnapshot,
   addDoc,
 } from "firebase/firestore";
@@ -144,6 +148,9 @@ export default function App() {
     let unsubscribeAuth: () => void;
     let unsubscribeDoc: () => void;
 
+    let unsubscribeOrders: () => void;
+    let unsubscribeSupport: () => void;
+
     unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -162,33 +169,35 @@ export default function App() {
             }
           },
         );
+
+        unsubscribeOrders = onSnapshot(
+          collection(db, "orders"),
+          (snapshot) => {
+            const fbOrders: Order[] = [];
+            snapshot.forEach((doc) => {
+              fbOrders.push({ id: doc.id, ...doc.data() } as Order);
+            });
+            setOrders(fbOrders);
+          },
+        );
+
+        unsubscribeSupport = onSnapshot(
+          collection(db, "support_requests"),
+          (snapshot) => {
+            const fbReqs: any[] = [];
+            snapshot.forEach((doc) => {
+              fbReqs.push({ id: doc.id, ...doc.data() });
+            });
+            setSupportRequests(fbReqs);
+          }
+        );
       } else {
         setUserRole(null);
         if (unsubscribeDoc) unsubscribeDoc();
+        if (unsubscribeOrders) unsubscribeOrders();
+        if (unsubscribeSupport) unsubscribeSupport();
       }
     });
-
-    const unsubscribeOrders = onSnapshot(
-      collection(db, "orders"),
-      (snapshot) => {
-        const fbOrders: Order[] = [];
-        snapshot.forEach((doc) => {
-          fbOrders.push({ id: doc.id, ...doc.data() } as Order);
-        });
-        setOrders(fbOrders);
-      },
-    );
-
-    const unsubscribeSupport = onSnapshot(
-      collection(db, "support_requests"),
-      (snapshot) => {
-        const fbReqs: any[] = [];
-        snapshot.forEach((doc) => {
-          fbReqs.push({ id: doc.id, ...doc.data() });
-        });
-        setSupportRequests(fbReqs);
-      }
-    );
 
     const unsubscribeProducts = onSnapshot(
       collection(db, "products"),
@@ -204,9 +213,9 @@ export default function App() {
     return () => {
       if (unsubscribeAuth) unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
-      unsubscribeOrders();
-      unsubscribeProducts();
-      unsubscribeSupport();
+      if (unsubscribeOrders) unsubscribeOrders();
+      if (unsubscribeProducts) unsubscribeProducts();
+      if (unsubscribeSupport) unsubscribeSupport();
     };
   }, []);
 
@@ -216,15 +225,22 @@ export default function App() {
       return;
     }
     if (cart.length === 0) return;
-    if (!userAddress) {
-      setSuccessModal({ isOpen: true, message: "Please add a shipping address in your profile first." });
-      return;
-    }
+    
     try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      
+      if (!userData.address) {
+        setSuccessModal({ isOpen: true, message: "Please add a shipping address in your profile first." });
+        return;
+      }
+      
       await addDoc(collection(db, "orders"), {
         userId: user.uid,
         userEmail: user.email,
-        shippingAddress: userAddress,
+        customerName: userData.name || 'Unknown',
+        customerPhone: userData.phone || 'Unknown',
+        shippingAddress: userData.address,
         items: cart,
         total: cartTotal * 1.08,
         status: "pending",
@@ -334,16 +350,30 @@ export default function App() {
                 Campaign
               </button>
               {user ? (
-                <button
-                  onClick={() => {
-                    if (userRole === "admin") setCurrentView("admin");
-                    else if (userRole === "seller") setCurrentView("seller");
-                    else setCurrentView("profile");
-                  }}
-                  className="hover:text-[#D4FF00] transition-colors uppercase"
-                >
-                  {userRole === "admin" ? "ADMIN" : userRole === "seller" ? "SELLER DASH" : "PROFILE"}
-                </button>
+                <>
+                  <button
+                    onClick={() => setCurrentView("profile")}
+                    className="hover:text-[#D4FF00] transition-colors uppercase"
+                  >
+                    PROFILE
+                  </button>
+                  {userRole === "admin" && (
+                    <button
+                      onClick={() => setCurrentView("admin")}
+                      className="hover:text-[#D4FF00] transition-colors uppercase"
+                    >
+                      ADMIN
+                    </button>
+                  )}
+                  {userRole === "seller" && (
+                    <button
+                      onClick={() => setCurrentView("seller")}
+                      className="hover:text-[#D4FF00] transition-colors uppercase"
+                    >
+                      SELLER DASH
+                    </button>
+                  )}
+                </>
               ) : (
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
@@ -370,14 +400,14 @@ export default function App() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-4 md:gap-6">
-            <div className="relative flex items-center">
-              <Search className="w-5 h-5 absolute left-3 text-neutral-400" />
+            <div className="relative flex items-center group">
+              <Search className="w-5 h-5 absolute left-3 text-neutral-400 z-10 pointer-events-none" />
               <input
                 type="text"
                 placeholder="SEARCH"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-transparent border border-transparent sm:border-neutral-700 focus:border-white text-white uppercase tracking-widest text-xs font-bold py-2 pl-10 pr-2 md:pr-4 w-10 sm:w-32 md:w-48 transition-all outline-none focus:w-40 md:focus:w-64 cursor-pointer focus:cursor-text"
+                className="bg-transparent border border-transparent sm:border-neutral-700 focus:border-white text-white uppercase tracking-widest text-xs font-bold py-2 pl-10 pr-2 md:pr-4 w-12 sm:w-32 md:w-48 transition-all outline-none focus:w-48 md:focus:w-64 cursor-pointer focus:cursor-text opacity-0 sm:opacity-100 focus:opacity-100 group-hover:opacity-100"
               />
             </div>
             <button
@@ -524,7 +554,7 @@ export default function App() {
                           e.stopPropagation();
                           toggleFavorite(product.id);
                         }}
-                        className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ${favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                        className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ৳{favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
                       >
                         <Heart
                           className="w-4 h-4"
@@ -543,7 +573,7 @@ export default function App() {
                       <div className="flex items-end justify-between mt-auto">
                         <div className="flex flex-col">
                           <span className="text-xl font-black text-white">
-                            ${product.price.toFixed(2)}
+                            ৳{product.price.toFixed(2)}
                           </span>
                         </div>
                         <button
@@ -620,7 +650,7 @@ export default function App() {
                       <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
-                        className={`px-6 py-2 rounded-full transition-colors ${
+                        className={`px-6 py-2 rounded-full transition-colors ৳{
                           activeCategory === cat
                             ? "bg-[#D4FF00] text-black border-2 border-[#D4FF00]"
                             : "border-2 border-neutral-800 text-neutral-400 hover:border-white hover:text-white"
@@ -663,7 +693,7 @@ export default function App() {
                             e.stopPropagation();
                             toggleFavorite(product.id);
                           }}
-                          className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ${favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                          className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ৳{favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
                         >
                           <Heart
                             className="w-4 h-4"
@@ -682,7 +712,7 @@ export default function App() {
                         <div className="flex items-end justify-between mt-auto">
                           <div className="flex flex-col">
                             <span className="text-xl font-black text-white">
-                              ${product.price.toFixed(2)}
+                              ৳{product.price.toFixed(2)}
                             </span>
                           </div>
                           <button
@@ -723,7 +753,7 @@ export default function App() {
                 />
                 <button
                   onClick={() => toggleFavorite(selectedProduct.id)}
-                  className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ${favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                  className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ৳{favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
                 >
                   <Heart
                     className="w-5 h-5"
@@ -753,7 +783,7 @@ export default function App() {
                   {selectedProduct.name}
                 </h1>
                 <p className="text-3xl font-black text-white mb-8">
-                  ${selectedProduct.price.toFixed(2)}
+                  ৳{selectedProduct.price.toFixed(2)}
                 </p>
                 <div className="prose prose-invert max-w-none text-neutral-400 font-medium mb-10">
                   <p>
@@ -868,7 +898,7 @@ export default function App() {
                             </p>
                           </div>
                           <span className="font-bold text-lg whitespace-nowrap">
-                            ${(item.product.price * item.quantity).toFixed(2)}
+                            ৳{(item.product.price * item.quantity).toFixed(2)}
                           </span>
                         </div>
 
@@ -920,7 +950,7 @@ export default function App() {
                     <div className="flex justify-between">
                       <span>Items ({cartItemCount}):</span>
                       <span className="text-neutral-200">
-                        ${cartTotal.toFixed(2)}
+                        ৳{cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -930,13 +960,13 @@ export default function App() {
                     <div className="flex justify-between">
                       <span>Total before tax:</span>
                       <span className="text-neutral-200">
-                        ${cartTotal.toFixed(2)}
+                        ৳{cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Estimated tax (8%):</span>
                       <span className="text-neutral-200">
-                        ${(cartTotal * 0.08).toFixed(2)}
+                        ৳{(cartTotal * 0.08).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -947,7 +977,7 @@ export default function App() {
                         Order Total:
                       </span>
                       <span className="font-black text-2xl text-neutral-100">
-                        ${(cartTotal * 1.08).toFixed(2)}
+                        ৳{(cartTotal * 1.08).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1014,19 +1044,19 @@ export default function App() {
                 <div className="flex border-b-2 border-neutral-800 bg-neutral-900 px-6 sm:px-8">
                   <button
                     onClick={() => setActiveTab("inventory")}
-                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "inventory" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ৳{activeTab === "inventory" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
                   >
                     Inventory
                   </button>
                   <button
                     onClick={() => setActiveTab("orders")}
-                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "orders" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ৳{activeTab === "orders" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
                   >
                     Orders
                   </button>
                   <button
                     onClick={() => setActiveTab("support")}
-                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "support" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ৳{activeTab === "support" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
                   >
                     Support
                   </button>
@@ -1045,7 +1075,7 @@ export default function App() {
                           </div>
                           <div>
                             <div className="text-4xl font-black text-white tracking-tighter mb-2">
-                              $1,248.50
+                              ৳1,248.50
                             </div>
                             <div className="text-xs text-[#D4FF00] font-bold uppercase tracking-widest flex items-center gap-1">
                               <TrendingUp className="w-4 h-4" /> +14.5% VS
@@ -1145,7 +1175,7 @@ export default function App() {
                                       PRM-{(1000 + i).toString()}
                                     </td>
                                     <td className="px-6 py-4 font-black text-white">
-                                      ${p.price.toFixed(2)}
+                                      ৳{p.price.toFixed(2)}
                                     </td>
                                     <td className="px-6 py-4 text-white font-bold">
                                       {Math.floor(Math.random() * 50) + 5} UNITS
@@ -1237,7 +1267,7 @@ export default function App() {
                                       TOTAL
                                     </div>
                                     <div className="text-white font-black text-xl">
-                                      $
+                                      ৳
                                       {sellerItems
                                         .reduce(
                                           (acc, item) =>
@@ -1246,6 +1276,28 @@ export default function App() {
                                           0,
                                         )
                                         .toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mb-6 p-4 bg-neutral-900 border border-neutral-800">
+                                  <h4 className="text-xs text-[#D4FF00] font-black uppercase tracking-widest mb-3">Customer Details</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <span className="text-neutral-500 font-bold uppercase tracking-widest text-[10px] block mb-1">Name</span>
+                                      <span className="text-white font-medium">{order.customerName || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-neutral-500 font-bold uppercase tracking-widest text-[10px] block mb-1">Email</span>
+                                      <span className="text-white font-medium">{order.userEmail}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-neutral-500 font-bold uppercase tracking-widest text-[10px] block mb-1">Phone</span>
+                                      <span className="text-white font-medium">{order.customerPhone || 'N/A'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-neutral-500 font-bold uppercase tracking-widest text-[10px] block mb-1">Address</span>
+                                      <span className="text-white font-medium block whitespace-pre-wrap">{order.shippingAddress || 'N/A'}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -1268,7 +1320,7 @@ export default function App() {
                                           {item.product.name}
                                         </div>
                                         <div className="text-neutral-500 text-xs font-bold uppercase tracking-widest mt-1">
-                                          QTY: {item.quantity} × $
+                                          QTY: {item.quantity} × ৳
                                           {item.product.price.toFixed(2)}
                                         </div>
                                       </div>
@@ -1367,7 +1419,7 @@ export default function App() {
 
       {/* Mobile Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 w-4/5 max-w-sm bg-neutral-950 z-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${isMenuOpen ? "translate-x-0" : "-translate-x-full"} flex flex-col`}
+        className={`fixed inset-y-0 left-0 w-4/5 max-w-sm bg-neutral-950 z-50 shadow-2xl transform transition-transform duration-300 ease-in-out ৳{isMenuOpen ? "translate-x-0" : "-translate-x-full"} flex flex-col`}
       >
         <div className="bg-neutral-900 p-4 border-b border-neutral-800 flex items-center justify-between">
           <div className="flex items-center gap-2">

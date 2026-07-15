@@ -60,7 +60,7 @@ export default function GiftCards({ user }: { user: any }) {
         <div className="bg-black border-2 border-neutral-800 p-8 md:p-12 flex flex-col md:flex-row gap-8 items-center">
           <div className="flex-1 w-full aspect-video bg-neutral-900 flex items-center justify-center border border-neutral-800 relative">
             <div className="absolute top-4 left-4 text-[#D4FF00] font-black tracking-widest uppercase text-xs">PRIME STOCK</div>
-            <div className="text-6xl font-black text-white">$${amount}</div>
+            <div className="text-6xl font-black text-white">৳{amount}</div>
           </div>
           <div className="flex-1 space-y-6 w-full">
             <div>
@@ -75,10 +75,10 @@ export default function GiftCards({ user }: { user: any }) {
               onChange={(e) => setAmount(Number(e.target.value))}
               className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-4 focus:border-[#D4FF00] outline-none font-bold uppercase tracking-widest"
             >
-              <option value={25}>$25 USD</option>
-              <option value={50}>$50 USD</option>
-              <option value={100}>$100 USD</option>
-              <option value={200}>$200 USD</option>
+              <option value={25}>৳2,125 BDT</option>
+              <option value={50}>৳4,250 BDT</option>
+              <option value={100}>৳8,500 BDT</option>
+              <option value={200}>৳17,000 BDT</option>
             </select>
             <button 
               onClick={handlePurchase}

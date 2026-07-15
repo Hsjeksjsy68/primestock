@@ -1,9 +1,8 @@
-import React from 'react';
-import { Package, Heart, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Package, Heart, LogOut, Save } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { useState, useEffect } from 'react';
 
 export default function UserProfile({ 
   user,
@@ -18,6 +17,51 @@ export default function UserProfile({
   products: any[], 
   onViewProduct: (id: string) => void 
 }) {
+  const [profileData, setProfileData] = useState({
+    name: '',
+    phone: '',
+    address: ''
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        const docRef = doc(db, 'users', user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setProfileData({
+            name: data.name || '',
+            phone: data.phone || '',
+            address: data.address || ''
+          });
+        }
+      }
+    };
+    fetchProfile();
+  }, [user]);
+
+  const saveProfile = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    try {
+      const docRef = doc(db, 'users', user.uid);
+      await setDoc(docRef, {
+        name: profileData.name,
+        phone: profileData.phone,
+        address: profileData.address,
+        email: user.email
+      }, { merge: true });
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const userOrders = orders.filter(o => o.userId === user?.uid);
   const favoriteProducts = products.filter(p => favorites.includes(p.id));
 
@@ -41,25 +85,56 @@ export default function UserProfile({
       </div>
 
       <div className="bg-black border-2 border-neutral-800 p-8 mb-12">
-        <h2 className="text-2xl font-black uppercase text-white mb-4">SHIPPING ADDRESS</h2>
-        {isEditingAddress ? (
-          <div className="space-y-4">
-            <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full bg-neutral-900 border border-neutral-800 text-white p-4 focus:border-[#D4FF00] outline-none min-h-[100px]"
-              placeholder="Enter your full shipping address..."
-            />
-            <div className="flex gap-4">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-black uppercase text-white">CUSTOMER DETAILS</h2>
+          {!isEditing && (
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="border-2 border-[#D4FF00] text-[#D4FF00] font-black uppercase tracking-widest px-6 py-2 hover:bg-[#D4FF00] hover:text-black transition-colors text-xs"
+            >
+              EDIT DETAILS
+            </button>
+          )}
+        </div>
+
+        {isEditing ? (
+          <div className="space-y-4 max-w-2xl">
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Full Name</label>
+              <input
+                type="text"
+                value={profileData.name}
+                onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                className="w-full bg-neutral-900 border border-neutral-800 text-white p-4 focus:border-[#D4FF00] outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Phone Number</label>
+              <input
+                type="text"
+                value={profileData.phone}
+                onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                className="w-full bg-neutral-900 border border-neutral-800 text-white p-4 focus:border-[#D4FF00] outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Shipping Address</label>
+              <textarea
+                value={profileData.address}
+                onChange={(e) => setProfileData({...profileData, address: e.target.value})}
+                className="w-full bg-neutral-900 border border-neutral-800 text-white p-4 focus:border-[#D4FF00] outline-none min-h-[100px]"
+              />
+            </div>
+            <div className="flex gap-4 pt-4">
               <button 
-                onClick={saveAddress}
+                onClick={saveProfile}
                 disabled={isSaving}
-                className="bg-[#D4FF00] text-black font-black uppercase tracking-widest px-6 py-3 hover:bg-white transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 bg-[#D4FF00] text-black font-black uppercase tracking-widest px-6 py-3 hover:bg-white transition-colors disabled:opacity-50"
               >
-                {isSaving ? 'SAVING...' : 'SAVE ADDRESS'}
+                <Save className="w-4 h-4" /> {isSaving ? 'SAVING...' : 'SAVE DETAILS'}
               </button>
               <button 
-                onClick={() => setIsEditingAddress(false)}
+                onClick={() => setIsEditing(false)}
                 disabled={isSaving}
                 className="text-neutral-500 font-bold uppercase tracking-widest px-6 py-3 hover:text-white transition-colors"
               >
@@ -68,18 +143,19 @@ export default function UserProfile({
             </div>
           </div>
         ) : (
-          <div>
-            {address ? (
-              <p className="text-neutral-300 whitespace-pre-wrap font-mono mb-4">{address}</p>
-            ) : (
-              <p className="text-neutral-500 italic mb-4">No address saved yet. Save an address for faster checkout.</p>
-            )}
-            <button 
-              onClick={() => setIsEditingAddress(true)}
-              className="border-2 border-[#D4FF00] text-[#D4FF00] font-black uppercase tracking-widest px-6 py-2 hover:bg-[#D4FF00] hover:text-black transition-colors text-xs"
-            >
-              {address ? 'EDIT ADDRESS' : 'ADD ADDRESS'}
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-neutral-300">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-1">Full Name</p>
+              <p className="font-medium text-lg">{profileData.name || <span className="italic text-neutral-600">Not provided</span>}</p>
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-1">Phone Number</p>
+              <p className="font-medium text-lg">{profileData.phone || <span className="italic text-neutral-600">Not provided</span>}</p>
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-1">Shipping Address</p>
+              <p className="font-mono whitespace-pre-wrap">{profileData.address || <span className="italic font-sans text-neutral-600">No address saved yet. Save an address for faster checkout.</span>}</p>
+            </div>
           </div>
         )}
       </div>
@@ -106,13 +182,13 @@ export default function UserProfile({
                     {order.items.map((item: any, i: number) => (
                       <div key={i} className="flex justify-between items-center text-sm">
                         <span className="text-white font-medium">{item.product.name} x {item.quantity}</span>
-                        <span className="text-neutral-400">${(item.product.price * item.quantity).toFixed(2)}</span>
+                        <span className="text-neutral-400">৳{(item.product.price * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                   <div className="mt-4 pt-4 border-t border-neutral-800 flex justify-between items-center font-bold">
                     <span className="text-white uppercase tracking-widest">Total</span>
-                    <span className="text-[#D4FF00]">${order.total.toFixed(2)}</span>
+                    <span className="text-[#D4FF00]">৳{order.total.toFixed(2)}</span>
                   </div>
                 </div>
               ))}
@@ -140,7 +216,7 @@ export default function UserProfile({
                   </div>
                   <div className="p-4">
                     <h3 className="text-white font-bold truncate">{product.name}</h3>
-                    <p className="text-[#D4FF00] font-black mt-1">${product.price.toFixed(2)}</p>
+                    <p className="text-[#D4FF00] font-black mt-1">৳{product.price.toFixed(2)}</p>
                   </div>
                 </div>
               ))}

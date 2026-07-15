@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export default function AdminDashboard() {
@@ -38,6 +38,13 @@ export default function AdminDashboard() {
           status: 'approved'
         }
       });
+      await addDoc(collection(db, 'seller_approvals'), {
+        userId,
+        shopName: profile.shopName,
+        action: 'approved',
+        timestamp: new Date().toISOString(),
+        adminEmail: 'admin-001@primestock.com'
+      });
     } catch (err) {
       console.error(err);
       alert("Error approving seller");
@@ -51,6 +58,13 @@ export default function AdminDashboard() {
           ...profile,
           status: 'rejected'
         }
+      });
+      await addDoc(collection(db, 'seller_approvals'), {
+        userId,
+        shopName: profile.shopName,
+        action: 'rejected',
+        timestamp: new Date().toISOString(),
+        adminEmail: 'admin-001@primestock.com'
       });
     } catch (err) {
       console.error(err);
