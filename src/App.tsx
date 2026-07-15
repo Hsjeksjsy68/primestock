@@ -140,6 +140,25 @@ export default function App() {
   });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  const [showTopBar, setShowTopBar] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window !== 'undefined') {
+        if (window.scrollY > lastScrollY && window.scrollY > 100) {
+          setShowTopBar(false);
+        } else {
+          setShowTopBar(true);
+        }
+        setLastScrollY(window.scrollY);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY]);
+
   const selectedProduct = productId
     ? products.find((p) => p.id === productId) || null
     : null;
@@ -322,7 +341,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-neutral-950 font-sans text-neutral-100">
       {/* Header */}
-      <header className="bg-black text-white sticky top-0 z-50">
+      <header className={`bg-black text-white sticky top-0 z-50 transition-transform duration-300 ${showTopBar ? 'translate-y-0' : '-translate-y-full'}`}>
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           {/* Left: Nav actions */}
           <div className="flex items-center gap-6">
@@ -554,7 +573,7 @@ export default function App() {
                           e.stopPropagation();
                           toggleFavorite(product.id);
                         }}
-                        className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ৳{favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                        className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ${favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
                       >
                         <Heart
                           className="w-4 h-4"
@@ -573,7 +592,7 @@ export default function App() {
                       <div className="flex items-end justify-between mt-auto">
                         <div className="flex flex-col">
                           <span className="text-xl font-black text-white">
-                            ৳{product.price.toFixed(2)}
+                            ৳${product.price.toFixed(2)}
                           </span>
                         </div>
                         <button
@@ -650,7 +669,7 @@ export default function App() {
                       <button
                         key={cat}
                         onClick={() => setActiveCategory(cat)}
-                        className={`px-6 py-2 rounded-full transition-colors ৳{
+                        className={`px-6 py-2 rounded-full transition-colors ${
                           activeCategory === cat
                             ? "bg-[#D4FF00] text-black border-2 border-[#D4FF00]"
                             : "border-2 border-neutral-800 text-neutral-400 hover:border-white hover:text-white"
@@ -693,7 +712,7 @@ export default function App() {
                             e.stopPropagation();
                             toggleFavorite(product.id);
                           }}
-                          className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ৳{favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                          className={`absolute top-4 right-4 p-2 bg-black/80 backdrop-blur-md rounded-full transition-colors opacity-100 ${favorites.includes(product.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
                         >
                           <Heart
                             className="w-4 h-4"
@@ -712,7 +731,7 @@ export default function App() {
                         <div className="flex items-end justify-between mt-auto">
                           <div className="flex flex-col">
                             <span className="text-xl font-black text-white">
-                              ৳{product.price.toFixed(2)}
+                              ৳${product.price.toFixed(2)}
                             </span>
                           </div>
                           <button
@@ -753,7 +772,7 @@ export default function App() {
                 />
                 <button
                   onClick={() => toggleFavorite(selectedProduct.id)}
-                  className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ৳{favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                  className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ${favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
                 >
                   <Heart
                     className="w-5 h-5"
@@ -783,7 +802,7 @@ export default function App() {
                   {selectedProduct.name}
                 </h1>
                 <p className="text-3xl font-black text-white mb-8">
-                  ৳{selectedProduct.price.toFixed(2)}
+                  ৳${selectedProduct.price.toFixed(2)}
                 </p>
                 <div className="prose prose-invert max-w-none text-neutral-400 font-medium mb-10">
                   <p>
@@ -898,7 +917,7 @@ export default function App() {
                             </p>
                           </div>
                           <span className="font-bold text-lg whitespace-nowrap">
-                            ৳{(item.product.price * item.quantity).toFixed(2)}
+                            ৳${(item.product.price * item.quantity).toFixed(2)}
                           </span>
                         </div>
 
@@ -950,7 +969,7 @@ export default function App() {
                     <div className="flex justify-between">
                       <span>Items ({cartItemCount}):</span>
                       <span className="text-neutral-200">
-                        ৳{cartTotal.toFixed(2)}
+                        ৳${cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -960,13 +979,13 @@ export default function App() {
                     <div className="flex justify-between">
                       <span>Total before tax:</span>
                       <span className="text-neutral-200">
-                        ৳{cartTotal.toFixed(2)}
+                        ৳${cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Estimated tax (8%):</span>
                       <span className="text-neutral-200">
-                        ৳{(cartTotal * 0.08).toFixed(2)}
+                        ৳${(cartTotal * 0.08).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -977,7 +996,7 @@ export default function App() {
                         Order Total:
                       </span>
                       <span className="font-black text-2xl text-neutral-100">
-                        ৳{(cartTotal * 1.08).toFixed(2)}
+                        ৳${(cartTotal * 1.08).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -1044,19 +1063,19 @@ export default function App() {
                 <div className="flex border-b-2 border-neutral-800 bg-neutral-900 px-6 sm:px-8">
                   <button
                     onClick={() => setActiveTab("inventory")}
-                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ৳{activeTab === "inventory" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "inventory" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
                   >
                     Inventory
                   </button>
                   <button
                     onClick={() => setActiveTab("orders")}
-                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ৳{activeTab === "orders" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "orders" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
                   >
                     Orders
                   </button>
                   <button
                     onClick={() => setActiveTab("support")}
-                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ৳{activeTab === "support" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "support" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
                   >
                     Support
                   </button>
@@ -1175,7 +1194,7 @@ export default function App() {
                                       PRM-{(1000 + i).toString()}
                                     </td>
                                     <td className="px-6 py-4 font-black text-white">
-                                      ৳{p.price.toFixed(2)}
+                                      ৳${p.price.toFixed(2)}
                                     </td>
                                     <td className="px-6 py-4 text-white font-bold">
                                       {Math.floor(Math.random() * 50) + 5} UNITS
@@ -1378,14 +1397,8 @@ export default function App() {
         {currentView === "customer-service" && <CustomerService />}
         {currentView === "admin" && <AdminDashboard />}
         {currentView === "gift-cards" && <GiftCards user={user} />}
-        {currentView === "deals" && <Deals products={products} onViewProduct={(id) => {
-          setSelectedProductId(id);
-          setCurrentView("product");
-        }} />}
-        {currentView === "best-sellers" && <BestSellers products={products} onViewProduct={(id) => {
-          setSelectedProductId(id);
-          setCurrentView("product");
-        }} />}
+        {currentView === "deals" && <Deals />}
+        {currentView === "best-sellers" && <BestSellers products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} addToCart={addToCart} toggleFavorite={toggleFavorite} favorites={favorites} />}
         {currentView === "registry" && <Registry />}
         {["deals", "registry"].includes(currentView) && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center animate-in fade-in duration-500">
@@ -1419,7 +1432,7 @@ export default function App() {
 
       {/* Mobile Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 w-4/5 max-w-sm bg-neutral-950 z-50 shadow-2xl transform transition-transform duration-300 ease-in-out ৳{isMenuOpen ? "translate-x-0" : "-translate-x-full"} flex flex-col`}
+        className={`fixed inset-y-0 left-0 w-4/5 max-w-sm bg-neutral-950 z-50 shadow-2xl transform transition-transform duration-300 ease-in-out ${isMenuOpen ? "translate-x-0" : "-translate-x-full"} flex flex-col`}
       >
         <div className="bg-neutral-900 p-4 border-b border-neutral-800 flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -40,7 +40,7 @@ export default function BestSellers({ products, onViewProduct, addToCart, toggle
                   <h3 className="font-bold text-lg mb-2 text-white truncate cursor-pointer hover:text-[#D4FF00]" onClick={() => onViewProduct(product.id)}>
                     {product.name}
                   </h3>
-                  <div className="font-black text-xl text-[#D4FF00] mb-4">${product.price.toFixed(2)}</div>
+                  <div className="font-black text-xl text-[#D4FF00] mb-4">৳${product.price.toFixed(2)}</div>
                 </div>
                 <button
                   onClick={() => addToCart(product)}
