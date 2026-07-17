@@ -777,7 +777,7 @@ export default function App() {
                 <img
                   src={(selectedProduct.images && selectedProduct.images.length > 0) ? selectedProduct.images[activeProductImageIndex] : selectedProduct.image}
                   alt={selectedProduct.name}
-                  className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700 max-h-[600px]"
+                  className="w-full h-full object-contain mix-blend-luminosity hover:mix-blend-normal transition-all duration-700 max-h-[600px]"
                 />
                 <button
                   onClick={() => toggleFavorite(selectedProduct.id)}
