@@ -773,34 +773,33 @@ export default function App() {
             </button>
             <div className="flex flex-col md:flex-row gap-12">
               {/* Product Image */}
-              <div className="flex-1 flex flex-col gap-4">
-                <div className="bg-neutral-900 border border-neutral-800 relative flex items-center justify-center p-12 min-h-[500px]">
-                  <img
-                    src={(selectedProduct.images && selectedProduct.images.length > 0) ? selectedProduct.images[activeProductImageIndex] : selectedProduct.image}
-                    alt={selectedProduct.name}
-                    className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700 max-h-[600px]"
+              <div className="flex-1 bg-neutral-900 border border-neutral-800 relative flex flex-col items-center justify-center p-4 md:p-12 min-h-[500px]">
+                <img
+                  src={(selectedProduct.images && selectedProduct.images.length > 0) ? selectedProduct.images[activeProductImageIndex] : selectedProduct.image}
+                  alt={selectedProduct.name}
+                  className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700 max-h-[600px]"
+                />
+                <button
+                  onClick={() => toggleFavorite(selectedProduct.id)}
+                  className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ${favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                >
+                  <Heart
+                    className="w-5 h-5"
+                    fill={
+                      favorites.includes(selectedProduct.id)
+                        ? "currentColor"
+                        : "none"
+                    }
                   />
-                  <button
-                    onClick={() => toggleFavorite(selectedProduct.id)}
-                    className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ${favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
-                  >
-                    <Heart
-                      className="w-5 h-5"
-                      fill={
-                        favorites.includes(selectedProduct.id)
-                          ? "currentColor"
-                          : "none"
-                      }
-                    />
-                  </button>
-                </div>
+                </button>
+                
                 {selectedProduct.images && selectedProduct.images.length > 1 && (
-                  <div className="grid grid-cols-5 gap-4">
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3 p-3 bg-black/50 backdrop-blur-md border border-neutral-800">
                     {selectedProduct.images.map((img, idx) => (
                       <button
                         key={idx}
                         onClick={() => setActiveProductImageIndex(idx)}
-                        className={`relative aspect-square border-2 transition-colors ${activeProductImageIndex === idx ? 'border-[#D4FF00]' : 'border-neutral-800 hover:border-neutral-600'}`}
+                        className={`w-16 h-16 relative border-2 transition-all ${activeProductImageIndex === idx ? 'border-[#D4FF00] scale-110' : 'border-neutral-600/50 hover:border-neutral-400 opacity-70 hover:opacity-100'}`}
                       >
                         <img src={img} alt={`${selectedProduct.name} thumbnail ${idx + 1}`} className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal" />
                       </button>
