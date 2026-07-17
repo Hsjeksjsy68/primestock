@@ -7,10 +7,11 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('TOPS');
-  const [image, setImage] = useState('');
+  const [customCategory, setCustomCategory] = useState('');
+  const [images, setImages] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [deliveryAvailable, setDeliveryAvailable] = useState(true);
-  const [sizes, setSizes] = useState('S, M, L');
+  const [sizes, setSizes] = useState('');
   const [stock, setStock] = useState('10');
   const [sku, setSku] = useState('');
   const [brand, setBrand] = useState('');
@@ -18,6 +19,43 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,11 +67,12 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
       await addDoc(collection(db, 'products'), {
         name,
         price: parseFloat(price),
-        category,
-        image,
+        category: category === 'CUSTOM' ? customCategory.toUpperCase() : category,
+        image: images[0] || '',
+        images,
         description,
         deliveryAvailable,
-        sizes: sizes.split(',').map(s => s.trim()),
+        sizes: sizes ? sizes.split(',').map(s => s.trim()) : [],
         stock: parseInt(stock),
         sku,
         brand,
@@ -107,16 +146,29 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">CATEGORY *</label>
-                <select 
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors appearance-none"
-                >
-                  <option value="TOPS">TOPS</option>
-                  <option value="BOTTOMS">BOTTOMS</option>
-                  <option value="OUTERWEAR">OUTERWEAR</option>
-                  <option value="ACCESSORIES">ACCESSORIES</option>
-                </select>
+                <div className="flex gap-2">
+                  <select 
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className={`bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors appearance-none ${category === 'CUSTOM' ? 'w-1/3' : 'w-full'}`}
+                  >
+                    <option value="TOPS">TOPS</option>
+                    <option value="BOTTOMS">BOTTOMS</option>
+                    <option value="OUTERWEAR">OUTERWEAR</option>
+                    <option value="ACCESSORIES">ACCESSORIES</option>
+                    <option value="CUSTOM">CUSTOM...</option>
+                  </select>
+                  {category === 'CUSTOM' && (
+                    <input 
+                      type="text"
+                      required
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      placeholder="e.g. CARD GAME"
+                      className="w-2/3 bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors uppercase"
+                    />
+                  )}
+                </div>
               </div>
             </div>
             
@@ -179,12 +231,12 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
             </div>
             
             <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">AVAILABLE SIZES *</label>
+              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">AVAILABLE SIZES (OPTIONAL)</label>
               <input 
                 type="text" 
                 value={sizes}
                 onChange={(e) => setSizes(e.target.value)}
-                placeholder="S, M, L, XL"
+                placeholder="e.g. S, M, L, XL (leave blank for none)"
                 className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors"
               />
             </div>
@@ -199,41 +251,55 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
           </div>
           
           <div>
-            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRODUCT IMAGE *</label>
-            <div className="relative border-2 border-dashed border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-[#D4FF00] transition-colors p-8 text-center">
-              <input 
-                type="file" 
-                accept="image/*"
-                required={!image}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setImage(reader.result as string);
-                    };
-                    reader.readAsDataURL(file);
-                  }
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              {!image ? (
+            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRODUCT IMAGES (ADD UP TO 5) *</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              {images.map((img, idx) => (
+                <div key={idx} className="relative aspect-square w-full overflow-hidden border border-neutral-800 group">
+                  <img src={img} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setImages(images.filter((_, i) => i !== idx))}
+                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Plus className="w-4 h-4 rotate-45" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {images.length < 5 && (
+              <div className="relative border-2 border-dashed border-neutral-700 bg-neutral-900 hover:bg-neutral-800 hover:border-[#D4FF00] transition-colors p-8 text-center">
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  multiple
+                  required={images.length === 0}
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 0) {
+                      setLoading(true);
+                      try {
+                        const newImages = await Promise.all(
+                          files.slice(0, 5 - images.length).map(compressImage)
+                        );
+                        setImages([...images, ...newImages]);
+                      } catch (err) {
+                        setError('Failed to process image(s)');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <Upload className="w-8 h-8 text-neutral-500" />
                   <div>
-                    <p className="text-white font-bold tracking-widest uppercase mb-1">Click to upload image</p>
-                    <p className="text-neutral-500 text-xs">PNG, JPG up to 5MB</p>
+                    <p className="text-white font-bold tracking-widest uppercase mb-1">Click to add images</p>
+                    <p className="text-neutral-500 text-xs">PNG, JPG up to 5MB (Max 5)</p>
                   </div>
                 </div>
-              ) : (
-                <div className="relative aspect-video w-full max-w-sm mx-auto overflow-hidden border border-neutral-800">
-                  <img src={image} alt="Preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                    <p className="text-white font-bold uppercase tracking-widest text-sm">Change Image</p>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 

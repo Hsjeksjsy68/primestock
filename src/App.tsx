@@ -8,6 +8,7 @@ interface Product {
   rating: number;
   reviews: number;
   image: string;
+  images?: string[];
   seller: string;
   sellerId?: string;
   deliveryAvailable?: boolean;
@@ -160,6 +161,12 @@ export default function App() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
+
+  const [activeProductImageIndex, setActiveProductImageIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveProductImageIndex(0);
+  }, [productId]);
 
   const selectedProduct = productId
     ? products.find((p) => p.id === productId) || null
@@ -666,7 +673,7 @@ export default function App() {
               {/* Category Pills */}
               {!searchQuery && (
                 <div className="flex flex-wrap gap-4 mb-12 uppercase text-xs font-bold tracking-widest">
-                  {["ALL", "OUTERWEAR", "TOPS", "BOTTOMS", "ACCESSORIES"].map(
+                  {["ALL", ...Array.from(new Set(products.map(p => (p.category || 'OTHER').toUpperCase())))].map(
                     (cat) => (
                       <button
                         key={cat}
@@ -766,25 +773,40 @@ export default function App() {
             </button>
             <div className="flex flex-col md:flex-row gap-12">
               {/* Product Image */}
-              <div className="flex-1 bg-neutral-900 border border-neutral-800 relative flex items-center justify-center p-12 min-h-[500px]">
-                <img
-                  src={selectedProduct.image}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700 max-h-[600px]"
-                />
-                <button
-                  onClick={() => toggleFavorite(selectedProduct.id)}
-                  className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ${favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
-                >
-                  <Heart
-                    className="w-5 h-5"
-                    fill={
-                      favorites.includes(selectedProduct.id)
-                        ? "currentColor"
-                        : "none"
-                    }
+              <div className="flex-1 flex flex-col gap-4">
+                <div className="bg-neutral-900 border border-neutral-800 relative flex items-center justify-center p-12 min-h-[500px]">
+                  <img
+                    src={(selectedProduct.images && selectedProduct.images.length > 0) ? selectedProduct.images[activeProductImageIndex] : selectedProduct.image}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-700 max-h-[600px]"
                   />
-                </button>
+                  <button
+                    onClick={() => toggleFavorite(selectedProduct.id)}
+                    className={`absolute top-6 right-6 p-3 bg-black/80 backdrop-blur-md rounded-full transition-colors ${favorites.includes(selectedProduct.id) ? "text-red-500 hover:text-red-400" : "text-white hover:text-[#D4FF00]"}`}
+                  >
+                    <Heart
+                      className="w-5 h-5"
+                      fill={
+                        favorites.includes(selectedProduct.id)
+                          ? "currentColor"
+                          : "none"
+                      }
+                    />
+                  </button>
+                </div>
+                {selectedProduct.images && selectedProduct.images.length > 1 && (
+                  <div className="grid grid-cols-5 gap-4">
+                    {selectedProduct.images.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveProductImageIndex(idx)}
+                        className={`relative aspect-square border-2 transition-colors ${activeProductImageIndex === idx ? 'border-[#D4FF00]' : 'border-neutral-800 hover:border-neutral-600'}`}
+                      >
+                        <img src={img} alt={`${selectedProduct.name} thumbnail ${idx + 1}`} className="w-full h-full object-cover mix-blend-luminosity hover:mix-blend-normal" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Product Info */}
@@ -1102,17 +1124,21 @@ export default function App() {
                         <div className="bg-black border-2 border-neutral-800 p-6 flex flex-col justify-between">
                           <div className="flex items-start justify-between mb-8">
                             <h3 className="font-bold text-neutral-400 uppercase tracking-widest text-xs">
-                              TODAY'S REVENUE
+                              TOTAL REVENUE
                             </h3>
                             <BarChart3 className="w-6 h-6 text-[#D4FF00]" />
                           </div>
                           <div>
                             <div className="text-4xl font-black text-white tracking-tighter mb-2">
-                              ৳1,248.50
+                              ৳{orders.reduce((total, order) => {
+                                if (order.status === 'cancelled') return total;
+                                const sellerItems = order.items.filter(item => item.product.sellerId === user?.uid);
+                                const itemsTotal = sellerItems.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+                                return total + itemsTotal;
+                              }, 0).toFixed(2)}
                             </div>
                             <div className="text-xs text-[#D4FF00] font-bold uppercase tracking-widest flex items-center gap-1">
-                              <TrendingUp className="w-4 h-4" /> +14.5% VS
-                              YESTERDAY
+                              <TrendingUp className="w-4 h-4" /> ALL TIME
                             </div>
                           </div>
                         </div>
@@ -1125,17 +1151,10 @@ export default function App() {
                           </div>
                           <div>
                             <div className="text-4xl font-black text-white tracking-tighter mb-2">
-                              {
-                                products.filter(
-                                  (p) =>
-                                    p.sellerId === user?.uid ||
-                                    p.seller === user?.email ||
-                                    !p.sellerId,
-                                ).length
-                              }
+                              {products.filter(p => p.sellerId === user?.uid).length}
                             </div>
                             <div className="text-xs text-neutral-500 font-bold uppercase tracking-widest">
-                              ACROSS 4 CATEGORIES
+                              PRODUCTS LIVE
                             </div>
                           </div>
                         </div>
@@ -1148,10 +1167,16 @@ export default function App() {
                           </div>
                           <div>
                             <div className="text-4xl font-black text-white tracking-tighter mb-2">
-                              4.8
+                              {(() => {
+                                const sellerProducts = products.filter(p => p.sellerId === user?.uid);
+                                const totalReviews = sellerProducts.reduce((sum, p) => sum + (p.reviews || 0), 0);
+                                return totalReviews > 0 
+                                  ? (sellerProducts.reduce((sum, p) => sum + ((p.rating || 0) * (p.reviews || 0)), 0) / totalReviews).toFixed(1)
+                                  : "0.0";
+                              })()}
                             </div>
                             <div className="text-xs text-neutral-500 font-bold uppercase tracking-widest">
-                              BASED ON 2,105 REVIEWS
+                              BASED ON {products.filter(p => p.sellerId === user?.uid).reduce((sum, p) => sum + (p.reviews || 0), 0)} REVIEWS
                             </div>
                           </div>
                         </div>
@@ -1512,46 +1537,19 @@ export default function App() {
           <div className="px-6 mb-2">
             <h3 className="font-black text-lg text-white">Categories</h3>
           </div>
-          <button
-            onClick={() => {
-              setCurrentView("shop");
-              setActiveCategory("TOPS");
-              setIsMenuOpen(false);
-            }}
-            className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 flex items-center justify-between transition-colors uppercase tracking-widest text-sm font-bold"
-          >
-            TOPS <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("shop");
-              setActiveCategory("BOTTOMS");
-              setIsMenuOpen(false);
-            }}
-            className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 flex items-center justify-between transition-colors uppercase tracking-widest text-sm font-bold"
-          >
-            BOTTOMS <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("shop");
-              setActiveCategory("OUTERWEAR");
-              setIsMenuOpen(false);
-            }}
-            className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 flex items-center justify-between transition-colors uppercase tracking-widest text-sm font-bold"
-          >
-            OUTERWEAR <ChevronRight className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("shop");
-              setActiveCategory("ACCESSORIES");
-              setIsMenuOpen(false);
-            }}
-            className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 flex items-center justify-between transition-colors uppercase tracking-widest text-sm font-bold"
-          >
-            ACCESSORIES <ChevronRight className="w-4 h-4" />
-          </button>
+          {Array.from(new Set(products.map(p => (p.category || 'OTHER').toUpperCase()))).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => {
+                setCurrentView("shop");
+                setActiveCategory(cat);
+                setIsMenuOpen(false);
+              }}
+              className="w-full text-left px-6 py-3 text-neutral-300 hover:bg-neutral-900 flex items-center justify-between transition-colors uppercase tracking-widest text-sm font-bold"
+            >
+              {cat} <ChevronRight className="w-4 h-4" />
+            </button>
+          ))}
 
           <div className="my-4 border-t border-neutral-800" />
 
