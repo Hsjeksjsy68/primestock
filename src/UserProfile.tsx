@@ -20,7 +20,8 @@ export default function UserProfile({
   const [profileData, setProfileData] = useState({
     name: '',
     phone: '',
-    address: ''
+    address: '',
+    photoURL: ''
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -35,7 +36,8 @@ export default function UserProfile({
           setProfileData({
             name: data.name || '',
             phone: data.phone || '',
-            address: data.address || ''
+            address: data.address || '',
+            photoURL: data.photoURL || ''
           });
         }
       }
@@ -52,6 +54,7 @@ export default function UserProfile({
         name: profileData.name,
         phone: profileData.phone,
         address: profileData.address,
+        photoURL: profileData.photoURL,
         email: user.email
       }, { merge: true });
       setIsEditing(false);
@@ -100,6 +103,16 @@ export default function UserProfile({
         {isEditing ? (
           <div className="space-y-4 max-w-2xl">
             <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Profile Picture URL</label>
+              <input
+                type="text"
+                value={profileData.photoURL}
+                onChange={(e) => setProfileData({...profileData, photoURL: e.target.value})}
+                placeholder="https://..."
+                className="w-full bg-neutral-900 border border-neutral-800 text-white p-4 focus:border-[#D4FF00] outline-none"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Full Name</label>
               <input
                 type="text"
@@ -144,6 +157,11 @@ export default function UserProfile({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-neutral-300">
+            {profileData.photoURL && (
+              <div className="md:col-span-2 flex items-center gap-4">
+                <img src={profileData.photoURL} alt="Profile" className="w-20 h-20 rounded-full object-cover border-2 border-[#D4FF00]" />
+              </div>
+            )}
             <div>
               <p className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-1">Full Name</p>
               <p className="font-medium text-lg">{profileData.name || <span className="italic text-neutral-600">Not provided</span>}</p>
@@ -173,7 +191,10 @@ export default function UserProfile({
               {userOrders.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(order => (
                 <div key={order.id} className="border border-neutral-800 p-4 bg-neutral-900">
                   <div className="flex justify-between items-center mb-4 pb-4 border-b border-neutral-800">
-                    <span className="text-neutral-400 font-mono text-xs">{new Date(order.createdAt).toLocaleDateString()}</span>
+                    <div>
+                      <span className="text-neutral-400 font-mono text-xs block mb-1">ID: {order.id}</span>
+                      <span className="text-neutral-500 font-mono text-xs">{new Date(order.createdAt).toLocaleDateString()}</span>
+                    </div>
                     <span className="bg-[#D4FF00] text-black text-[10px] font-black uppercase tracking-widest px-2 py-1">
                       {order.status}
                     </span>

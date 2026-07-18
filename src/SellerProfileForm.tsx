@@ -13,7 +13,9 @@ export default function SellerProfileForm({ onComplete }: { onComplete: () => vo
     officeAddress: '',
     shopName: '',
     shopLocation: '',
-    sellerEmail: ''
+    sellerEmail: '',
+    logo: '',
+    banner: ''
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +85,14 @@ export default function SellerProfileForm({ onComplete }: { onComplete: () => vo
           <div className="md:col-span-2">
             <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Shop/Brand Location</label>
             <input required name="shopLocation" value={formData.shopLocation} onChange={handleChange} className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Logo URL (Optional)</label>
+            <input name="logo" value={formData.logo} onChange={handleChange} placeholder="https://..." className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
+          </div>
+          <div className="md:col-span-2">
+            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Banner URL (Optional)</label>
+            <input name="banner" value={formData.banner} onChange={handleChange} placeholder="https://..." className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
           </div>
         </div>
 

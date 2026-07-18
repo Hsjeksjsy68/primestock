@@ -1,5 +1,13 @@
 // --- Types & Mock Data ---
 
+interface Comment {
+  id: string;
+  userId: string;
+  userName: string;
+  text: string;
+  createdAt: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -18,6 +26,11 @@ interface Product {
   sku?: string;
   brand?: string;
   shippingFee?: number;
+  isAuction?: boolean;
+  auctionEndDate?: string | null;
+  currentBid?: number | null;
+  highestBidder?: string | null;
+  comments?: Comment[];
 }
 
 interface SellerProfile {
@@ -29,12 +42,15 @@ interface SellerProfile {
   shopName: string;
   shopLocation: string;
   sellerEmail: string;
+  logo?: string;
+  banner?: string;
 }
 
 interface UserDoc {
   role: string;
   email: string;
   address?: string;
+  photoURL?: string;
   sellerProfile?: SellerProfile;
 }
 
@@ -98,6 +114,8 @@ import Deals from "./Deals";
 import GiftCards from "./GiftCards";
 import Registry from "./Registry";
 import BestSellers from "./BestSellers";
+import BrandStore from "./BrandStore";
+import ProductComments from "./ProductComments";
 
 import {
   collection,
@@ -105,6 +123,7 @@ import {
   deleteDoc, getDoc,
   onSnapshot,
   addDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 export default function App() {
@@ -142,6 +161,43 @@ export default function App() {
     message: "",
   });
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [bidAmount, setBidAmount] = useState("");
+  const [sellers, setSellers] = useState<any[]>([]);
+
+  const placeBid = async (productId: string) => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+    const product = products.find(p => p.id === productId);
+    if (!product || !product.isAuction) return;
+
+    const currentBid = product.currentBid || product.price;
+    const newBid = parseFloat(bidAmount);
+
+    if (isNaN(newBid) || newBid <= currentBid) {
+      setSuccessModal({
+        isOpen: true,
+        message: "Your bid must be higher than the current bid.",
+      });
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "products", productId), {
+        currentBid: newBid,
+        highestBidder: user.email,
+      });
+      setBidAmount("");
+      setSuccessModal({
+        isOpen: true,
+        message: "Bid placed successfully!",
+      });
+    } catch (error) {
+      console.error("Error placing bid", error);
+    }
+  };
 
   const [showTopBar, setShowTopBar] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -238,12 +294,27 @@ export default function App() {
       },
     );
 
+    const unsubscribeSellers = onSnapshot(
+      collection(db, "users"),
+      (snapshot) => {
+        const fbSellers: any[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.role === "seller" && data.sellerProfile && data.sellerProfile.status === "approved") {
+            fbSellers.push({ id: doc.id, ...data });
+          }
+        });
+        setSellers(fbSellers);
+      }
+    );
+
     return () => {
       if (unsubscribeAuth) unsubscribeAuth();
       if (unsubscribeDoc) unsubscribeDoc();
       if (unsubscribeOrders) unsubscribeOrders();
       if (unsubscribeProducts) unsubscribeProducts();
       if (unsubscribeSupport) unsubscribeSupport();
+      if (unsubscribeSellers) unsubscribeSellers();
     };
   }, []);
 
@@ -370,6 +441,12 @@ export default function App() {
                 className="hover:text-[#D4FF00] transition-colors"
               >
                 Shop
+              </button>
+              <button
+                onClick={() => setCurrentView("auctions")}
+                className="hover:text-[#D4FF00] transition-colors"
+              >
+                Auctions
               </button>
               <button
                 onClick={() => setCurrentView("deals")}
@@ -546,6 +623,94 @@ export default function App() {
               </div>
             )}
 
+            {/* Suggested Brand Stores */}
+            {!searchQuery && sellers.length > 0 && (
+              <div className="pt-12 border-t border-neutral-800">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+                  <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter leading-none">
+                    BRAND
+                    <br />
+                    STORES
+                  </h2>
+                  <p className="text-neutral-400 text-sm tracking-widest uppercase max-w-xs md:text-right font-medium">
+                    Discover official brands and top sellers.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {sellers.slice(0, 4).map((seller) => (
+                    <div
+                      key={seller.id}
+                      onClick={() => navigate("/brand/" + seller.id)}
+                      className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl hover:border-[#D4FF00] transition-colors cursor-pointer group text-center"
+                    >
+                      <div className="w-20 h-20 mx-auto mb-4 bg-black border-2 border-neutral-800 group-hover:border-[#D4FF00] transition-colors flex items-center justify-center rounded-full overflow-hidden">
+                        {seller.sellerProfile?.logo ? (
+                          <img src={seller.sellerProfile.logo} alt={seller.sellerProfile.shopName} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl font-black text-white">{seller.sellerProfile?.shopName?.charAt(0) || seller.email.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-lg text-white uppercase tracking-tighter mb-2 truncate">
+                        {seller.sellerProfile?.shopName || seller.email.split('@')[0]}
+                      </h3>
+                      <p className="text-xs text-neutral-500 uppercase tracking-widest font-bold">
+                        {seller.sellerProfile?.shopLocation || 'Global'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Auction Suggestions */}
+            {!searchQuery && products.filter(p => p.isAuction).length > 0 && (
+              <div className="pt-12 border-t border-neutral-800">
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+                  <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter leading-none">
+                    LIVE
+                    <br />
+                    AUCTIONS
+                  </h2>
+                  <p className="text-neutral-400 text-sm tracking-widest uppercase max-w-xs md:text-right font-medium">
+                    Bid on exclusive drops and rare items.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {products.filter(p => p.isAuction).slice(0, 4).map((product) => (
+                    <div
+                      key={product.id}
+                      onClick={() => navigate("/product/" + product.id)}
+                      className="bg-neutral-900 border border-neutral-800 overflow-hidden hover:border-[#D4FF00] transition-colors group flex flex-col rounded-2xl cursor-pointer relative"
+                    >
+                      <div className="absolute top-4 right-4 bg-[#D4FF00] text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest z-10 animate-pulse">
+                        LIVE AUCTION
+                      </div>
+                      <div className="aspect-[4/5] bg-neutral-800 relative flex items-center justify-center overflow-hidden">
+                        <img
+                          src={product.image}
+                          alt={product.name}
+                          className="object-cover w-full h-full mix-blend-luminosity opacity-80 group-hover:mix-blend-normal group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                        />
+                      </div>
+                      <div className="p-5 flex flex-col flex-1 bg-black">
+                        <h3 className="font-bold text-lg text-white uppercase tracking-tighter leading-tight mb-4 flex-1">
+                          {product.name}
+                        </h3>
+                        <div>
+                          <span className="text-[10px] font-bold text-[#D4FF00] uppercase tracking-widest mb-1 block">
+                            CURRENT BID
+                          </span>
+                          <span className="text-xl font-black text-[#D4FF00]">
+                            ৳{(product.currentBid || product.price).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Suggested Products */}
             <div className="pt-12">
               <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
@@ -600,20 +765,33 @@ export default function App() {
                       </h3>
                       <div className="flex items-end justify-between mt-auto">
                         <div className="flex flex-col">
-                          <span className="text-xl font-black text-white">
-                            ৳{product.price.toFixed(2)}
-                          </span>
+                          {product.isAuction ? (
+                            <>
+                              <span className="text-[10px] font-bold text-[#D4FF00] uppercase tracking-widest mb-1">
+                                CURRENT BID
+                              </span>
+                              <span className="text-xl font-black text-[#D4FF00]">
+                                ৳{(product.currentBid || product.price).toFixed(2)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-xl font-black text-white">
+                              ৳{product.price.toFixed(2)}
+                            </span>
+                          )}
                         </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addToCart(product);
-                          }}
-                          className="bg-transparent hover:bg-[#D4FF00] border border-neutral-700 hover:border-[#D4FF00] text-white hover:text-black p-3 rounded-full transition-all flex items-center justify-center"
-                          aria-label="Add to cart"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
+                        {!product.isAuction && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addToCart(product);
+                            }}
+                            className="bg-transparent hover:bg-[#D4FF00] border border-neutral-700 hover:border-[#D4FF00] text-white hover:text-black p-3 rounded-full transition-all flex items-center justify-center"
+                            aria-label="Add to cart"
+                          >
+                            <Plus className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -628,6 +806,62 @@ export default function App() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {currentView === "auctions" && (
+          <div className="animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+              <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-none">
+                LIVE
+                <br />
+                AUCTIONS
+              </h2>
+              <p className="text-neutral-400 text-sm tracking-widest uppercase max-w-xs md:text-right font-medium">
+                Bid on exclusive drops.
+              </p>
+            </div>
+            {products.filter(p => p.isAuction).length === 0 ? (
+              <div className="text-center py-20">
+                <h3 className="text-lg font-medium text-neutral-500 uppercase tracking-widest">
+                  No active auctions.
+                </h3>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {products.filter(p => p.isAuction).map((product) => (
+                  <div
+                    key={product.id}
+                    onClick={() => navigate("/product/" + product.id)}
+                    className="bg-neutral-900 border border-neutral-800 overflow-hidden hover:border-[#D4FF00] transition-colors group flex flex-col rounded-2xl cursor-pointer relative"
+                  >
+                    <div className="absolute top-4 right-4 bg-[#D4FF00] text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest z-10 animate-pulse">
+                      LIVE AUCTION
+                    </div>
+                    <div className="aspect-[4/5] bg-neutral-800 relative flex items-center justify-center overflow-hidden">
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="object-cover w-full h-full mix-blend-luminosity opacity-80 group-hover:mix-blend-normal group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+                      />
+                    </div>
+                    <div className="p-5 flex flex-col flex-1 bg-black">
+                      <h3 className="font-bold text-lg text-white uppercase tracking-tighter leading-tight mb-4 flex-1">
+                        {product.name}
+                      </h3>
+                      <div>
+                        <span className="text-[10px] font-bold text-[#D4FF00] uppercase tracking-widest mb-1 block">
+                          CURRENT BID
+                        </span>
+                        <span className="text-xl font-black text-[#D4FF00]">
+                          ৳{(product.currentBid || product.price).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -739,20 +973,33 @@ export default function App() {
                         </h3>
                         <div className="flex items-end justify-between mt-auto">
                           <div className="flex flex-col">
-                            <span className="text-xl font-black text-white">
-                              ৳{product.price.toFixed(2)}
-                            </span>
+                            {product.isAuction ? (
+                              <>
+                                <span className="text-[10px] font-bold text-[#D4FF00] uppercase tracking-widest mb-1">
+                                  CURRENT BID
+                                </span>
+                                <span className="text-xl font-black text-[#D4FF00]">
+                                  ৳{(product.currentBid || product.price).toFixed(2)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xl font-black text-white">
+                                ৳{product.price.toFixed(2)}
+                              </span>
+                            )}
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              addToCart(product);
-                            }}
-                            className="bg-transparent hover:bg-[#D4FF00] border border-neutral-700 hover:border-[#D4FF00] text-white hover:text-black p-3 rounded-full transition-all flex items-center justify-center"
-                            aria-label="Add to cart"
-                          >
-                            <Plus className="w-5 h-5" />
-                          </button>
+                          {!product.isAuction && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(product);
+                              }}
+                              className="bg-transparent hover:bg-[#D4FF00] border border-neutral-700 hover:border-[#D4FF00] text-white hover:text-black p-3 rounded-full transition-all flex items-center justify-center"
+                              aria-label="Add to cart"
+                            >
+                              <Plus className="w-5 h-5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -824,9 +1071,32 @@ export default function App() {
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter leading-none mb-6">
                   {selectedProduct.name}
                 </h1>
-                <p className="text-3xl font-black text-white mb-8">
-                  ৳{selectedProduct.price.toFixed(2)}
-                </p>
+                
+                {selectedProduct.isAuction ? (
+                  <div className="mb-8">
+                    <p className="text-sm font-bold text-neutral-400 uppercase tracking-widest mb-1">
+                      CURRENT BID
+                    </p>
+                    <p className="text-4xl font-black text-[#D4FF00] mb-2">
+                      ৳{(selectedProduct.currentBid || selectedProduct.price).toFixed(2)}
+                    </p>
+                    {selectedProduct.highestBidder && (
+                      <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-4">
+                        HIGHEST BIDDER: {selectedProduct.highestBidder}
+                      </p>
+                    )}
+                    {selectedProduct.auctionEndDate && (
+                      <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-4">
+                        ENDS: {new Date(selectedProduct.auctionEndDate).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-3xl font-black text-white mb-8">
+                    ৳{selectedProduct.price.toFixed(2)}
+                  </p>
+                )}
+
                 <div className="prose prose-invert max-w-none text-neutral-400 font-medium mb-10">
                   <p>
                     {selectedProduct.description ||
@@ -857,7 +1127,16 @@ export default function App() {
                         &bull; DELIVERY: <span className="text-white">AVAILABLE</span> {selectedProduct.shippingFee ? `(৳{selectedProduct.shippingFee.toFixed(2)})` : ''}
                       </li>
                     )}
-                    <li>&bull; SELLER: {selectedProduct.seller}</li>
+                    <li>
+                      &bull; SELLER:{" "}
+                      {selectedProduct.sellerId ? (
+                        <button onClick={() => navigate(`/brand/${selectedProduct.sellerId}`)} className="text-white hover:text-[#D4FF00] transition-colors underline decoration-[#D4FF00] underline-offset-4">
+                          {selectedProduct.seller}
+                        </button>
+                      ) : (
+                        <span className="text-white">{selectedProduct.seller}</span>
+                      )}
+                    </li>
                   </ul>
                 </div>
 
@@ -875,12 +1154,30 @@ export default function App() {
                 </div>
 
                 <div className="flex gap-4">
-                  <button
-                    onClick={() => addToCart(selectedProduct)}
-                    className="flex-1 bg-[#D4FF00] hover:bg-white text-black font-black uppercase tracking-widest py-5 px-8 transition-colors flex items-center justify-center gap-3 border-2 border-transparent"
-                  >
-                    ADD TO CART <Plus className="w-5 h-5" />
-                  </button>
+                  {selectedProduct.isAuction ? (
+                    <div className="flex-1 flex gap-2">
+                      <input 
+                        type="number" 
+                        value={bidAmount}
+                        onChange={(e) => setBidAmount(e.target.value)}
+                        placeholder="ENTER BID AMOUNT"
+                        className="flex-1 bg-black border-2 border-neutral-800 focus:border-[#D4FF00] text-white py-5 px-4 font-bold outline-none transition-colors"
+                      />
+                      <button
+                        onClick={() => placeBid(selectedProduct.id)}
+                        className="bg-[#D4FF00] hover:bg-white text-black font-black uppercase tracking-widest py-5 px-8 transition-colors flex items-center justify-center border-2 border-transparent"
+                      >
+                        PLACE BID
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => addToCart(selectedProduct)}
+                      className="flex-1 bg-[#D4FF00] hover:bg-white text-black font-black uppercase tracking-widest py-5 px-8 transition-colors flex items-center justify-center gap-3 border-2 border-transparent"
+                    >
+                      ADD TO CART <Plus className="w-5 h-5" />
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(window.location.origin + '/product/' + selectedProduct.id);
@@ -894,6 +1191,8 @@ export default function App() {
                 </div>
               </div>
             </div>
+            
+            <ProductComments productId={selectedProduct.id} user={user} />
           </div>
         )}
 
@@ -948,7 +1247,13 @@ export default function App() {
                               In Stock
                             </p>
                             <p className="text-xs text-neutral-500 mb-4">
-                              Sold by: {item.product.seller}
+                              Sold by: {item.product.sellerId ? (
+                                <button onClick={() => navigate(`/brand/${item.product.sellerId}`)} className="hover:text-[#D4FF00] transition-colors underline decoration-[#D4FF00] underline-offset-4">
+                                  {item.product.seller}
+                                </button>
+                              ) : (
+                                item.product.seller
+                              )}
                             </p>
                           </div>
                           <span className="font-bold text-lg whitespace-nowrap">
@@ -1088,7 +1393,10 @@ export default function App() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setCurrentView("add-listing")}
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setCurrentView("add-listing");
+                    }}
                     className="bg-black hover:bg-neutral-800 text-white font-black py-4 px-6 uppercase tracking-widest transition-colors flex items-center gap-2 border-2 border-black"
                   >
                     <Plus className="w-5 h-5" /> ADD LISTING
@@ -1243,6 +1551,15 @@ export default function App() {
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 text-right flex justify-end gap-2">
+                                      <button
+                                        onClick={() => {
+                                          setEditingProduct(p);
+                                          setCurrentView("add-listing");
+                                        }}
+                                        className="text-blue-400 hover:text-blue-300 hover:underline font-medium uppercase text-xs tracking-widest flex items-center gap-1 mr-2"
+                                      >
+                                        Edit
+                                      </button>
                                       <button
                                         onClick={() => deleteProduct(p.id)}
                                         className="text-red-400 hover:text-red-300 hover:underline font-medium uppercase text-xs tracking-widest flex items-center gap-1"
@@ -1434,7 +1751,8 @@ export default function App() {
 
         {currentView === "customer-service" && <CustomerService />}
         {currentView === "profile" && <UserProfile user={user} orders={orders} favorites={favorites} products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} />}
-        {currentView === "add-listing" && <AddListing onBack={() => setCurrentView("seller")} />}
+        {currentView === "add-listing" && <AddListing onBack={() => setCurrentView("seller")} productToEdit={editingProduct} />}
+        {currentView === "brand" && <BrandStore sellerId={pathParts[2]} products={products} onViewProduct={(id: string) => navigate("/product/" + id)} addToCart={addToCart} toggleFavorite={toggleFavorite} favorites={favorites} />}
         {currentView === "admin" && <AdminDashboard />}
         {currentView === "gift-cards" && <GiftCards user={user} />}
         {currentView === "deals" && <Deals />}

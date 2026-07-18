@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { Package, Plus, Image as ImageIcon, ArrowLeft, Upload, DollarSign, Info, Truck } from 'lucide-react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
-export default function AddListing({ onBack }: { onBack: () => void }) {
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('TOPS');
+export default function AddListing({ onBack, productToEdit }: { onBack: () => void, productToEdit?: any }) {
+  const [name, setName] = useState(productToEdit?.name || '');
+  const [price, setPrice] = useState(productToEdit?.price?.toString() || '');
+  const [category, setCategory] = useState(productToEdit?.category || 'TOPS');
   const [customCategory, setCustomCategory] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [description, setDescription] = useState('');
-  const [deliveryAvailable, setDeliveryAvailable] = useState(true);
-  const [sizes, setSizes] = useState('');
-  const [stock, setStock] = useState('10');
-  const [sku, setSku] = useState('');
-  const [brand, setBrand] = useState('');
-  const [shippingFee, setShippingFee] = useState('0');
+  const [images, setImages] = useState<string[]>(productToEdit?.images || (productToEdit?.image ? [productToEdit.image] : []));
+  const [description, setDescription] = useState(productToEdit?.description || '');
+  const [deliveryAvailable, setDeliveryAvailable] = useState(productToEdit?.deliveryAvailable ?? true);
+  const [sizes, setSizes] = useState(productToEdit?.sizes?.join(', ') || '');
+  const [stock, setStock] = useState(productToEdit?.stock?.toString() || '10');
+  const [sku, setSku] = useState(productToEdit?.sku || '');
+  const [brand, setBrand] = useState(productToEdit?.brand || '');
+  const [shippingFee, setShippingFee] = useState(productToEdit?.shippingFee?.toString() || '0');
+  const [isAuction, setIsAuction] = useState(productToEdit?.isAuction || false);
+  const [auctionEndDate, setAuctionEndDate] = useState(productToEdit?.auctionEndDate || '');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -64,7 +66,7 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
     try {
       if (!auth.currentUser) throw new Error('Not authenticated');
       
-      await addDoc(collection(db, 'products'), {
+      const productData: any = {
         name,
         price: parseFloat(price),
         category: category === 'CUSTOM' ? customCategory.toUpperCase() : category,
@@ -77,12 +79,27 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
         sku,
         brand,
         shippingFee: parseFloat(shippingFee),
-        sellerId: auth.currentUser.uid,
-        seller: auth.currentUser.email,
-        rating: 0,
-        reviews: 0,
-        createdAt: new Date().toISOString()
-      });
+        isAuction,
+      };
+
+      if (isAuction && auctionEndDate) {
+        productData.auctionEndDate = new Date(auctionEndDate).toISOString();
+      }
+
+      if (productToEdit) {
+        await updateDoc(doc(db, 'products', productToEdit.id), productData);
+      } else {
+        await addDoc(collection(db, 'products'), {
+          ...productData,
+          sellerId: auth.currentUser.uid,
+          seller: auth.currentUser.email,
+          rating: 0,
+          reviews: 0,
+          createdAt: new Date().toISOString(),
+          currentBid: isAuction ? parseFloat(price) : null,
+          highestBidder: null,
+        });
+      }
       
       onBack();
     } catch (err: any) {
@@ -193,7 +210,7 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRICE (৳) *</label>
+              <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">{isAuction ? 'STARTING BID (৳) *' : 'PRICE (৳) *'}</label>
               <input 
                 type="number" 
                 min="0"
@@ -205,6 +222,32 @@ export default function AddListing({ onBack }: { onBack: () => void }) {
                 className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors font-mono"
               />
             </div>
+
+            <div className="flex items-center space-x-4 mt-6">
+              <input
+                type="checkbox"
+                id="isAuction"
+                checked={isAuction}
+                onChange={(e) => setIsAuction(e.target.checked)}
+                className="w-5 h-5 border-2 border-neutral-800 bg-black checked:bg-[#D4FF00] checked:border-[#D4FF00]"
+              />
+              <label htmlFor="isAuction" className="text-sm font-black uppercase tracking-widest text-white cursor-pointer">
+                THIS IS AN AUCTION
+              </label>
+            </div>
+
+            {isAuction && (
+              <div className="md:col-span-2">
+                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">AUCTION END DATE *</label>
+                <input 
+                  type="datetime-local" 
+                  required={isAuction}
+                  value={auctionEndDate}
+                  onChange={(e) => setAuctionEndDate(e.target.value)}
+                  className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none transition-colors font-mono"
+                />
+              </div>
+            )}
             
             <div>
               <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">STOCK QUANTITY *</label>
