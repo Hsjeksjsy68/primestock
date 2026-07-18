@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, updateDoc, addDoc, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { compressImage } from "./utils/imageUtils";
+import { Upload } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<"sellers" | "support" | "campaigns" | "gift-cards" | "ads">("sellers");
@@ -12,6 +14,7 @@ export default function AdminDashboard() {
   const [ads, setAds] = useState<any[]>([]);
   const [adPricing, setAdPricing] = useState({ home_front: 500 });
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Form states
   const [showCampaignForm, setShowCampaignForm] = useState(false);
@@ -126,6 +129,10 @@ export default function AdminDashboard() {
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!campaignForm.bannerUrl) {
+      alert("Please upload a banner image");
+      return;
+    }
     try {
       await addDoc(collection(db, 'campaigns'), {
         name: campaignForm.name,
@@ -150,6 +157,10 @@ export default function AdminDashboard() {
 
   const handleCreateGiftCard = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!giftCardForm.imageUrl) {
+      alert("Please upload a gift card image");
+      return;
+    }
     try {
       await addDoc(collection(db, 'gift_card_templates'), {
         name: giftCardForm.name,
@@ -204,6 +215,10 @@ export default function AdminDashboard() {
 
   const handleCreatePrimeAd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!primeAdForm.imageUrl) {
+      alert("Please upload an ad image");
+      return;
+    }
     try {
       await addDoc(collection(db, 'ads'), {
         sellerId: 'admin',
@@ -221,6 +236,22 @@ export default function AdminDashboard() {
     } catch(err) {
       console.error(err);
       alert("Error creating Prime Stock ad.");
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, setter: any, field: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const base64Str = await compressImage(file);
+      setter((prev: any) => ({ ...prev, [field]: base64Str }));
+    } catch (err) {
+      console.error("Failed to process image", err);
+      alert("Failed to process image");
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -362,10 +393,30 @@ export default function AdminDashboard() {
                 <input required type="number" value={campaignForm.discountPercentage} onChange={e => setCampaignForm({...campaignForm, discountPercentage: e.target.value})} className="w-full bg-black border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Banner Image URL</label>
-                <input required value={campaignForm.bannerUrl} onChange={e => setCampaignForm({...campaignForm, bannerUrl: e.target.value})} className="w-full bg-black border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
+                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Banner Image</label>
+                <div className="flex flex-col gap-4">
+                  {campaignForm.bannerUrl && (
+                    <div className="w-full h-32 bg-black border border-neutral-800 overflow-hidden">
+                      <img src={campaignForm.bannerUrl} alt="Banner preview" className="w-full h-full object-cover opacity-80" />
+                    </div>
+                  )}
+                  <div className="relative w-full">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      required={!campaignForm.bannerUrl}
+                      onChange={e => handleImageUpload(e, setCampaignForm, 'bannerUrl')} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={uploadingImage}
+                    />
+                    <div className="w-full bg-black border border-neutral-800 border-dashed text-neutral-400 px-4 py-3 flex items-center justify-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      <span className="text-sm font-bold">{uploadingImage ? 'Processing...' : 'Click to upload banner image'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <button type="submit" className="bg-[#D4FF00] text-black font-black uppercase tracking-widest py-3 px-6 hover:bg-white transition-colors w-full">Save Campaign</button>
+              <button type="submit" disabled={uploadingImage} className="bg-[#D4FF00] text-black font-black uppercase tracking-widest py-3 px-6 hover:bg-white transition-colors w-full disabled:opacity-50">Save Campaign</button>
             </form>
           )}
 
@@ -431,10 +482,30 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Image URL</label>
-                <input required value={giftCardForm.imageUrl} onChange={e => setGiftCardForm({...giftCardForm, imageUrl: e.target.value})} className="w-full bg-black border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
+                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Gift Card Image</label>
+                <div className="flex flex-col gap-4">
+                  {giftCardForm.imageUrl && (
+                    <div className="w-full h-32 bg-black border border-neutral-800 overflow-hidden">
+                      <img src={giftCardForm.imageUrl} alt="Card preview" className="w-full h-full object-cover opacity-80" />
+                    </div>
+                  )}
+                  <div className="relative w-full">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      required={!giftCardForm.imageUrl}
+                      onChange={e => handleImageUpload(e, setGiftCardForm, 'imageUrl')} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={uploadingImage}
+                    />
+                    <div className="w-full bg-black border border-neutral-800 border-dashed text-neutral-400 px-4 py-3 flex items-center justify-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      <span className="text-sm font-bold">{uploadingImage ? 'Processing...' : 'Click to upload gift card image'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <button type="submit" className="bg-[#D4FF00] text-black font-black uppercase tracking-widest py-3 px-6 hover:bg-white transition-colors w-full">Save Gift Card</button>
+              <button type="submit" disabled={uploadingImage} className="bg-[#D4FF00] text-black font-black uppercase tracking-widest py-3 px-6 hover:bg-white transition-colors w-full disabled:opacity-50">Save Gift Card</button>
             </form>
           )}
 
@@ -497,14 +568,34 @@ export default function AdminDashboard() {
             <form onSubmit={handleCreatePrimeAd} className="mb-8 border border-neutral-800 p-6 bg-neutral-900 space-y-4 border-l-4 border-l-white">
               <h3 className="text-xl font-bold text-white mb-4 uppercase">New Prime Stock Official Ad</h3>
               <div>
-                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Image URL</label>
-                <input required type="url" value={primeAdForm.imageUrl} onChange={e => setPrimeAdForm({...primeAdForm, imageUrl: e.target.value})} className="w-full bg-black border border-neutral-800 text-white px-4 py-3 focus:border-white outline-none" />
+                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Ad Image</label>
+                <div className="flex flex-col gap-4">
+                  {primeAdForm.imageUrl && (
+                    <div className="w-full max-w-sm aspect-video bg-black border border-neutral-800 overflow-hidden">
+                      <img src={primeAdForm.imageUrl} alt="Ad preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="relative w-full max-w-sm">
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      required={!primeAdForm.imageUrl}
+                      onChange={e => handleImageUpload(e, setPrimeAdForm, 'imageUrl')} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={uploadingImage}
+                    />
+                    <div className="w-full bg-black border border-neutral-800 border-dashed text-neutral-400 px-4 py-3 flex items-center justify-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      <span className="text-sm font-bold">{uploadingImage ? 'Processing...' : 'Click to upload ad image'}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Target URL (Optional)</label>
                 <input type="url" value={primeAdForm.targetUrl} onChange={e => setPrimeAdForm({...primeAdForm, targetUrl: e.target.value})} className="w-full bg-black border border-neutral-800 text-white px-4 py-3 focus:border-white outline-none" />
               </div>
-              <button type="submit" className="bg-white text-black font-black uppercase tracking-widest py-3 px-6 hover:bg-[#D4FF00] transition-colors w-full">Save Official Ad</button>
+              <button type="submit" disabled={uploadingImage} className="bg-white text-black font-black uppercase tracking-widest py-3 px-6 hover:bg-[#D4FF00] transition-colors w-full disabled:opacity-50">Save Official Ad</button>
             </form>
           )}
 

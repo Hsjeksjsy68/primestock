@@ -1,19 +1,20 @@
 import { useState, useEffect } from "react";
-import { Plus, Target, Image as ImageIcon, CheckCircle, Clock } from 'lucide-react';
+import { Plus, Target, Image as ImageIcon, CheckCircle, Clock, Upload } from 'lucide-react';
 import { db } from './firebase';
 import { collection, addDoc, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
+import { compressImage } from "./utils/imageUtils";
 
 export default function SellerAdsTab({ user }: { user: any }) {
   const [ads, setAds] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [adForm, setAdForm] = useState({ placement: 'home_front', imageUrl: '', targetUrl: '' });
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [adPrice, setAdPrice] = useState(500);
   
   useEffect(() => {
-    // Fetch settings for ad price
     const fetchSettings = async () => {
       try {
         const settingsDoc = await getDoc(doc(db, 'settings', 'ad_pricing'));
@@ -43,6 +44,22 @@ export default function SellerAdsTab({ user }: { user: any }) {
     return () => unsubscribe();
   }, [user]);
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    setError('');
+    try {
+      const base64Str = await compressImage(file);
+      setAdForm(prev => ({ ...prev, imageUrl: base64Str }));
+    } catch (err: any) {
+      setError(`Failed to process image: ${err.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -50,13 +67,12 @@ export default function SellerAdsTab({ user }: { user: any }) {
     setLoading(true);
 
     if (!adForm.imageUrl) {
-      setError('Please provide an image URL for the ad.');
+      setError('Please provide an image for the ad.');
       setLoading(false);
       return;
     }
 
     try {
-      // Simulate wallet deduction
       await addDoc(collection(db, 'ads'), {
         sellerId: user.uid,
         sellerEmail: user.email,
@@ -120,19 +136,28 @@ export default function SellerAdsTab({ user }: { user: any }) {
 
             <div>
               <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2 flex items-center justify-between">
-                <span>Ad Image URL</span>
+                <span>Ad Image</span>
                 <span className="text-neutral-500 font-normal normal-case tracking-normal">Recommended ratio: 16:9 or 21:9</span>
               </label>
-              <div className="flex gap-4">
-                <div className="flex-1">
+              <div className="flex flex-col gap-4">
+                {adForm.imageUrl && (
+                  <div className="w-full max-w-sm aspect-video bg-black border border-neutral-800 overflow-hidden">
+                    <img src={adForm.imageUrl} alt="Ad preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="relative w-full max-w-sm">
                   <input 
-                    required 
-                    type="url"
-                    value={adForm.imageUrl} 
-                    onChange={e => setAdForm({...adForm, imageUrl: e.target.value})} 
-                    className="w-full bg-black border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" 
-                    placeholder="https://example.com/ad-image.jpg"
+                    type="file" 
+                    accept="image/*"
+                    required={!adForm.imageUrl}
+                    onChange={handleImageUpload} 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    disabled={uploadingImage}
                   />
+                  <div className="w-full bg-black border border-neutral-800 border-dashed text-neutral-400 px-4 py-3 flex items-center justify-center gap-2">
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm font-bold">{uploadingImage ? 'Processing...' : 'Click to upload ad image'}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -156,7 +181,7 @@ export default function SellerAdsTab({ user }: { user: any }) {
 
             <button 
               type="submit" 
-              disabled={loading}
+              disabled={loading || uploadingImage}
               className="w-full bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 hover:bg-white transition-colors disabled:opacity-50"
             >
               {loading ? 'PROCESSING...' : 'PAY AND SUBMIT FOR REVIEW'}

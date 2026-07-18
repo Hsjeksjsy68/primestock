@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from './firebase';
+import { compressImage } from './utils/imageUtils';
+import { Upload } from 'lucide-react';
 
 export default function SellerProfileForm({ onComplete }: { onComplete: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   
   const [formData, setFormData] = useState({
     tradeLicense: '',
@@ -22,10 +25,27 @@ export default function SellerProfileForm({ onComplete }: { onComplete: () => vo
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'banner') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    setError('');
+    try {
+      const base64Str = await compressImage(file);
+      setFormData(prev => ({ ...prev, [field]: base64Str }));
+    } catch (err: any) {
+      setError(`Failed to process image: ${err.message}`);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       if (!auth.currentUser) throw new Error("Not authenticated");
       const userRef = doc(db, 'users', auth.currentUser.uid);
@@ -86,17 +106,59 @@ export default function SellerProfileForm({ onComplete }: { onComplete: () => vo
             <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Shop/Brand Location</label>
             <input required name="shopLocation" value={formData.shopLocation} onChange={handleChange} className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
           </div>
+
+          {/* Logo Upload */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Logo URL (Optional)</label>
-            <input name="logo" value={formData.logo} onChange={handleChange} placeholder="https://..." className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
+            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Logo (Optional)</label>
+            <div className="flex items-center gap-4">
+              {formData.logo && (
+                <div className="w-16 h-16 bg-neutral-900 border border-neutral-800 shrink-0 overflow-hidden">
+                  <img src={formData.logo} alt="Logo preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="relative flex-1">
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e, 'logo')} 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                  disabled={uploadingImage}
+                />
+                <div className="w-full bg-neutral-900 border border-neutral-800 border-dashed text-neutral-400 px-4 py-3 flex items-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  <span className="text-sm font-bold">{uploadingImage ? 'Processing...' : 'Click to upload logo image'}</span>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Banner Upload */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Banner URL (Optional)</label>
-            <input name="banner" value={formData.banner} onChange={handleChange} placeholder="https://..." className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 focus:border-[#D4FF00] outline-none" />
+            <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Banner (Optional)</label>
+            <div className="flex flex-col gap-4">
+              {formData.banner && (
+                <div className="w-full h-32 bg-neutral-900 border border-neutral-800 overflow-hidden">
+                  <img src={formData.banner} alt="Banner preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="relative w-full">
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e, 'banner')} 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  disabled={uploadingImage}
+                />
+                <div className="w-full bg-neutral-900 border border-neutral-800 border-dashed text-neutral-400 px-4 py-3 flex items-center justify-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  <span className="text-sm font-bold">{uploadingImage ? 'Processing...' : 'Click to upload banner image'}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <button type="submit" disabled={loading} className="w-full bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 mt-8 hover:bg-white transition-colors disabled:opacity-50">
+        <button type="submit" disabled={loading || uploadingImage} className="w-full bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 mt-8 hover:bg-white transition-colors disabled:opacity-50">
           {loading ? 'SUBMITTING...' : 'SUBMIT VERIFICATION'}
         </button>
       </form>
