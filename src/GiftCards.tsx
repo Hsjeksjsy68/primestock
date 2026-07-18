@@ -1,13 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Gift, CheckCircle } from 'lucide-react';
 import { db } from './firebase';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot } from 'firebase/firestore';
 
 export default function GiftCards({ user }: { user: any }) {
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [amount, setAmount] = useState(100);
   const [loading, setLoading] = useState(false);
   const [purchasedCode, setPurchasedCode] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'gift_card_templates'), (snapshot) => {
+      const fbTemplates: any[] = [];
+      snapshot.forEach(doc => fbTemplates.push({ id: doc.id, ...doc.data() }));
+      setTemplates(fbTemplates);
+      if (fbTemplates.length > 0) {
+        setSelectedTemplate(fbTemplates[0]);
+        setAmount(fbTemplates[0].value);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleTemplateChange = (e: any) => {
+    const t = templates.find(t => t.id === e.target.value);
+    if (t) {
+      setSelectedTemplate(t);
+      setAmount(t.value);
+    }
+  };
 
   const handlePurchase = async () => {
     if (!user) {
@@ -20,8 +43,8 @@ export default function GiftCards({ user }: { user: any }) {
       const code = 'GC-' + Math.random().toString(36).substring(2, 10).toUpperCase();
       await addDoc(collection(db, 'gift_cards'), {
         code,
-        amount,
-        balance: amount,
+        amount: selectedTemplate ? selectedTemplate.value : amount,
+        balance: selectedTemplate ? selectedTemplate.value : amount,
         purchaserId: user.uid,
         purchaserEmail: user.email,
         createdAt: new Date().toISOString()
@@ -58,10 +81,16 @@ export default function GiftCards({ user }: { user: any }) {
         </div>
       ) : (
         <div className="bg-black border-2 border-neutral-800 p-8 md:p-12 flex flex-col md:flex-row gap-8 items-center">
-          <div className="flex-1 w-full aspect-video bg-neutral-900 flex items-center justify-center border border-neutral-800 relative">
+          <div className="flex-1 w-full aspect-video bg-neutral-900 flex items-center justify-center border border-neutral-800 relative overflow-hidden">
+            {selectedTemplate && selectedTemplate.imageUrl ? (
+              <img src={selectedTemplate.imageUrl} alt={selectedTemplate.name} className="absolute inset-0 w-full h-full object-cover mix-blend-luminosity opacity-40" />
+            ) : null}
             <div className="absolute top-4 left-4 text-[#D4FF00] font-black tracking-widest uppercase text-xs">PRIME STOCK</div>
-            <div className="text-6xl font-black text-white">৳{amount}</div>
+            <div className="text-6xl font-black text-white relative z-10">
+              ৳{selectedTemplate ? selectedTemplate.value : amount}
+            </div>
           </div>
+
           <div className="flex-1 space-y-6 w-full">
             <div>
               <h3 className="text-2xl font-bold text-white uppercase tracking-widest mb-2">Digital Gift Card</h3>
@@ -70,22 +99,35 @@ export default function GiftCards({ user }: { user: any }) {
             
             {error && <div className="text-red-500 font-bold p-3 bg-red-500/10 border border-red-500 text-sm">{error}</div>}
 
-            <select 
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-4 focus:border-[#D4FF00] outline-none font-bold uppercase tracking-widest"
-            >
-              <option value={25}>৳2,125 BDT</option>
-              <option value={50}>৳4,250 BDT</option>
-              <option value={100}>৳8,500 BDT</option>
-              <option value={200}>৳17,000 BDT</option>
-            </select>
+            {templates.length > 0 ? (
+              <select 
+                value={selectedTemplate?.id || ''}
+                onChange={handleTemplateChange}
+                className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-4 focus:border-[#D4FF00] outline-none font-bold uppercase tracking-widest"
+              >
+                {templates.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} - ৳{t.price} (Value: ৳{t.value})</option>
+                ))}
+              </select>
+            ) : (
+              <select 
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-4 focus:border-[#D4FF00] outline-none font-bold uppercase tracking-widest"
+              >
+                <option value={25}>৳2,125 BDT</option>
+                <option value={50}>৳4,250 BDT</option>
+                <option value={100}>৳8,500 BDT</option>
+                <option value={200}>৳17,000 BDT</option>
+              </select>
+            )}
+
             <button 
               onClick={handlePurchase}
               disabled={loading}
               className="w-full bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 hover:bg-white transition-colors disabled:opacity-50"
             >
-              {loading ? 'PROCESSING...' : 'PURCHASE GIFT CARD'}
+              {loading ? 'PROCESSING...' : `PURCHASE FOR ৳${selectedTemplate ? selectedTemplate.price : (amount * 85)}`}
             </button>
           </div>
         </div>

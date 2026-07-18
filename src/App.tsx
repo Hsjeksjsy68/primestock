@@ -116,6 +116,7 @@ import Registry from "./Registry";
 import BestSellers from "./BestSellers";
 import BrandStore from "./BrandStore";
 import ProductComments from "./ProductComments";
+import SellerAdsTab from "./SellerAdsTab";
 
 import {
   collection,
@@ -147,6 +148,7 @@ export default function App() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userAddress, setUserAddress] = useState<string>('');
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [activeAd, setActiveAd] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(
     null,
@@ -294,6 +296,22 @@ export default function App() {
       },
     );
 
+    const unsubscribeAds = onSnapshot(
+      collection(db, "ads"),
+      (snapshot) => {
+        let latestAd = null;
+        snapshot.forEach((doc) => {
+          const ad = { id: doc.id, ...doc.data() } as any;
+          if (ad.status === 'approved' && ad.placement === 'home_front') {
+            if (!latestAd || new Date(ad.createdAt) > new Date(latestAd.createdAt)) {
+              latestAd = ad;
+            }
+          }
+        });
+        setActiveAd(latestAd);
+      },
+    );
+
     const unsubscribeSellers = onSnapshot(
       collection(db, "users"),
       (snapshot) => {
@@ -315,6 +333,7 @@ export default function App() {
       if (unsubscribeProducts) unsubscribeProducts();
       if (unsubscribeSupport) unsubscribeSupport();
       if (unsubscribeSellers) unsubscribeSellers();
+      if (unsubscribeAds) unsubscribeAds();
     };
   }, []);
 
@@ -559,31 +578,46 @@ export default function App() {
           <div className="space-y-8 animate-in fade-in duration-500">
             {/* Hero Banner */}
             {!searchQuery && (
-              <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 text-white min-h-[60vh] flex flex-col items-center justify-center shadow-lg group">
-                <div className="absolute inset-0 w-full h-full">
-                  <img
-                    src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2000"
-                    alt="Mountains"
-                    className="w-full h-full object-cover grayscale opacity-40 group-hover:scale-105 transition-transform duration-1000"
-                  />
-                </div>
-                <div className="relative z-10 w-full flex flex-col items-center justify-center p-8">
-                  <h1 className="text-6xl md:text-9xl font-black leading-none tracking-tighter text-center uppercase drop-shadow-2xl">
-                    FOR GEN-Z
-                  </h1>
+              activeAd ? (
+                <a href={activeAd.targetUrl || '#'} target={activeAd.targetUrl ? "_blank" : "_self"} rel="noreferrer" className="block relative rounded-2xl overflow-hidden bg-black border border-neutral-800 text-white min-h-[60vh] flex flex-col items-center justify-center shadow-lg group cursor-pointer transition-transform hover:scale-[1.01]">
+                  <div className="absolute inset-0 w-full h-full">
+                    <img
+                      src={activeAd.imageUrl}
+                      alt="Featured Advertisement"
+                      className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-1000 mix-blend-luminosity hover:mix-blend-normal"
+                    />
+                  </div>
+                  <div className="absolute bottom-4 right-4 bg-black/80 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#D4FF00]">
+                    SPONSORED
+                  </div>
+                </a>
+              ) : (
+                <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 text-white min-h-[60vh] flex flex-col items-center justify-center shadow-lg group">
+                  <div className="absolute inset-0 w-full h-full">
+                    <img
+                      src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80&w=2000"
+                      alt="Mountains"
+                      className="w-full h-full object-cover grayscale opacity-40 group-hover:scale-105 transition-transform duration-1000"
+                    />
+                  </div>
+                  <div className="relative z-10 w-full flex flex-col items-center justify-center p-8">
+                    <h1 className="text-6xl md:text-9xl font-black leading-none tracking-tighter text-center uppercase drop-shadow-2xl">
+                      FOR GEN-Z
+                    </h1>
 
-                  <div className="mt-12 flex flex-col sm:flex-row items-center gap-8 text-sm md:text-base font-bold tracking-[0.2em] uppercase">
-                    <span>SS // 26</span>
-                    <button
-                      onClick={() => setCurrentView("shop")}
-                      className="border border-white hover:bg-white hover:text-black rounded-full px-8 py-3 transition-colors flex items-center gap-2"
-                    >
-                      EXPLORE <ArrowRight className="w-4 h-4" />
-                    </button>
-                    <span>GLOBAL</span>
+                    <div className="mt-12 flex flex-col sm:flex-row items-center gap-8 text-sm md:text-base font-bold tracking-[0.2em] uppercase">
+                      <span>SS // 26</span>
+                      <button
+                        onClick={() => setCurrentView("shop")}
+                        className="border border-white hover:bg-white hover:text-black rounded-full px-8 py-3 transition-colors flex items-center gap-2"
+                      >
+                        EXPLORE <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <span>GLOBAL</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )
             )}
 
             {/* Split Section: Radical Simplicity */}
@@ -1422,6 +1456,12 @@ export default function App() {
                   >
                     Support
                   </button>
+                  <button
+                    onClick={() => setActiveTab("ads")}
+                    className={`py-4 px-6 font-black uppercase tracking-widest text-sm border-b-2 transition-colors ${activeTab === "ads" ? "border-[#D4FF00] text-white" : "border-transparent text-neutral-500 hover:text-neutral-300"}`}
+                  >
+                    Run Ads
+                  </button>
                 </div>
                 <div className="p-6 sm:p-8">
                   {activeTab === "inventory" && (
@@ -1743,6 +1783,9 @@ export default function App() {
                       )}
                     </div>
                   )}
+                  {activeTab === "ads" && (
+                    <SellerAdsTab user={user} />
+                  )}
                 </div>
               </div>
             )}
@@ -1758,7 +1801,7 @@ export default function App() {
         {currentView === "deals" && <Deals />}
         {currentView === "best-sellers" && <BestSellers products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} addToCart={addToCart} toggleFavorite={toggleFavorite} favorites={favorites} />}
         {currentView === "registry" && <Registry />}
-        {["deals", "registry"].includes(currentView) && (
+        {["registry"].includes(currentView) && (
           <div className="flex flex-col items-center justify-center min-h-[50vh] text-center animate-in fade-in duration-500">
             <div className="w-24 h-24 border-2 border-[#D4FF00] flex items-center justify-center mb-8">
               <Star className="w-10 h-10 text-[#D4FF00]" />

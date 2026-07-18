@@ -7,7 +7,11 @@ service cloud.firestore {
     }
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    match /products/{productId}/comments/{commentId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     match /orders/{orderId} {
       allow read, create, update, delete: if request.auth != null;
@@ -18,8 +22,24 @@ service cloud.firestore {
     match /gift_cards/{cardId} {
       allow read, create, update, delete: if request.auth != null;
     }
+    match /gift_card_templates/{templateId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
     match /seller_approvals/{approvalId} {
       allow read, create, update, delete: if request.auth != null;
+    }
+    match /campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /ads/{adId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
   }
 }
