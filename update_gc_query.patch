@@ -1,0 +1,25 @@
+--- src/UserProfile.tsx
++++ src/UserProfile.tsx
+@@ -43,12 +43,21 @@
+         });
+         setUserOrders(orders);
+ 
++        // Fetch purchased gift cards
+         const gcQ = query(collection(db, "gift_cards"), where("purchaserId", "==", user.uid));
+         const gcSnap = await getDocs(gcQ);
+         const gcs: any[] = [];
+         gcSnap.forEach((doc) => {
+           gcs.push({ id: doc.id, ...doc.data() });
+         });
++        
++        // Fetch claimed gift cards
++        const claimedQ = query(collection(db, "gift_cards"), where("claimedBy", "==", user.uid));
++        const claimedSnap = await getDocs(claimedQ);
++        claimedSnap.forEach((doc) => {
++          if (!gcs.some(gc => gc.id === doc.id)) {
++            gcs.push({ id: doc.id, ...doc.data() });
++          }
++        });
++        
+         setGiftCards(gcs);
+       } catch (error) {

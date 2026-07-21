@@ -17,11 +17,14 @@ export default function UserProfile({ user, onViewProduct, favorites, products }
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [giftCards, setGiftCards] = useState<any[]>([]);
+
   const [profileData, setProfileData] = useState({
     name: user.displayName || '',
     phone: '',
     address: '',
-    photoURL: user.photoURL || ''
+    photoURL: user.photoURL || '',
+    walletBalance: 0
   });
 
   useEffect(() => {
@@ -34,7 +37,8 @@ export default function UserProfile({ user, onViewProduct, favorites, products }
             name: data.name || user.displayName || '',
             phone: data.phone || '',
             address: data.address || '',
-            photoURL: data.photoURL || user.photoURL || ''
+            photoURL: data.photoURL || user.photoURL || '',
+            walletBalance: data.walletBalance || 0
           });
         }
         
@@ -45,6 +49,23 @@ export default function UserProfile({ user, onViewProduct, favorites, products }
           orders.push({ id: doc.id, ...doc.data() });
         });
         setUserOrders(orders);
+
+        const gcQ = query(collection(db, "gift_cards"), where("purchaserId", "==", user.uid));
+        const gcSnap = await getDocs(gcQ);
+        const gcs: any[] = [];
+        gcSnap.forEach((doc) => {
+          gcs.push({ id: doc.id, ...doc.data() });
+        });
+
+        const claimedQ = query(collection(db, "gift_cards"), where("claimedBy", "==", user.uid));
+        const claimedSnap = await getDocs(claimedQ);
+        claimedSnap.forEach((doc) => {
+          if (!gcs.some(gc => gc.id === doc.id)) {
+            gcs.push({ id: doc.id, ...doc.data() });
+          }
+        });
+
+        setGiftCards(gcs);
       } catch (error) {
         console.error("Error fetching user data:", error);
       }
@@ -101,6 +122,12 @@ export default function UserProfile({ user, onViewProduct, favorites, products }
               <UserIcon className="w-8 h-8 md:w-10 md:h-10 text-[#D4FF00]" />
               MY ACCOUNT
             </h1>
+            
+            <div className="mt-4 flex items-center gap-2 text-[#D4FF00]">
+              <span className="text-xs font-black uppercase tracking-widest text-neutral-500">Wallet Balance:</span>
+              <span className="text-2xl font-black tracking-tighter">৳{(profileData.walletBalance || 0).toFixed(2)}</span>
+            </div>
+
             <p className="text-neutral-500 font-bold uppercase tracking-widest text-sm mt-2">{user.email}</p>
           </div>
           {!isEditing && (
@@ -272,6 +299,38 @@ export default function UserProfile({ user, onViewProduct, favorites, products }
             </div>
           )}
         </div>
+      </div>
+
+      {/* Gift Cards / Redeem Codes */}
+      <div className="bg-black border-2 border-neutral-800 p-6 sm:p-8">
+        <h2 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter flex items-center gap-2">
+          <Package className="w-6 h-6 text-[#D4FF00]" /> MY REDEEM CODES
+        </h2>
+        
+        {giftCards.length === 0 ? (
+          <p className="text-neutral-500 font-bold uppercase tracking-widest text-sm">No redeem codes found.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {giftCards.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(gc => (
+              <div key={gc.id} className="border border-neutral-800 bg-neutral-900 p-6 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-[#D4FF00]" />
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Code</div>
+                <div className="text-xl font-mono text-white font-bold tracking-widest mb-4">{gc.code}</div>
+                <div className="flex justify-between items-end border-t border-neutral-800 pt-4">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-1">Value</div>
+                    <div className="text-[#D4FF00] font-black text-lg">৳{gc.amount}</div>
+                  </div>
+                  <div>
+                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 ${gc.balance > 0 ? 'bg-[#D4FF00]/10 text-[#D4FF00] border border-[#D4FF00]' : 'bg-red-500/10 text-red-500 border border-red-500'}`}>
+                      {gc.balance > 0 ? 'AVAILABLE' : 'USED'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

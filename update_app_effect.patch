@@ -1,0 +1,22 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -232,6 +232,18 @@
+     };
+   }, [lastScrollY]);
+ 
++  useEffect(() => {
++    const fetchRegs = async () => {
++      if (!user) { setUserRegistries([]); return; }
++      const rq = query(collection(db, "registries"), where("userId", "==", user.uid));
++      const rsnap = await getDocs(rq);
++      const regs: any[] = [];
++      rsnap.forEach(doc => regs.push({ id: doc.id, ...doc.data() }));
++      setUserRegistries(regs);
++      if (regs.length > 0) setSelectedRegistryId(regs[0].id);
++    };
++    fetchRegs();
++  }, [user]);
++
+   useEffect(() => {
+     let unsubscribeAuth: () => void;
+     let unsubscribeDoc: () => void;

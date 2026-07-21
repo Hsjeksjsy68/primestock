@@ -74,7 +74,7 @@ export default function AddListing({ onBack, productToEdit }: { onBack: () => vo
         images,
         description,
         deliveryAvailable,
-        sizes: sizes ? sizes.split(',').map(s => s.trim()) : [],
+        sizes: sizes ? sizes.split(',').map((s: string) => s.trim()) : [],
         stock: parseInt(stock),
         sku,
         brand,

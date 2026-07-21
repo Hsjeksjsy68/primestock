@@ -1,11 +1,15 @@
 // --- Types & Mock Data ---
 
-interface Comment {
+export interface Comment {
   id: string;
+  productId?: string;
   userId: string;
   userName: string;
   text: string;
   createdAt: string;
+  rating?: number;
+  replyText?: string;
+  replyAt?: string;
 }
 
 interface Product {
@@ -65,6 +69,9 @@ interface Order {
   total: number;
   status: string;
   createdAt: string;
+  rating?: number;
+  replyText?: string;
+  replyAt?: string;
 }
 
 interface CartItem {
@@ -125,7 +132,7 @@ import {
   deleteDoc, getDoc,
   onSnapshot,
   addDoc,
-  updateDoc,
+  updateDoc
 } from "firebase/firestore";
 
 export default function App() {
@@ -148,7 +155,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userAddress, setUserAddress] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('cod');
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod' | 'wallet'>('cod');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [activeAd, setActiveAd] = useState<any>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -156,7 +163,7 @@ export default function App() {
     null,
   );
   const [orders, setOrders] = useState<Order[]>([]);
-  const [activeTab, setActiveTab] = useState<"inventory" | "orders" | "support">(
+  const [activeTab, setActiveTab] = useState<"inventory" | "orders" | "support" | "ads" | "settings">(
     "inventory",
   );
   const [supportRequests, setSupportRequests] = useState<any[]>([]);
@@ -301,7 +308,7 @@ export default function App() {
     const unsubscribeAds = onSnapshot(
       collection(db, "ads"),
       (snapshot) => {
-        let latestAd = null;
+        let latestAd: any = null;
         snapshot.forEach((doc) => {
           const ad = { id: doc.id, ...doc.data() } as any;
           if (ad.status === 'approved' && ad.placement === 'home_front') {
@@ -357,6 +364,18 @@ export default function App() {
       
       const shippingTotal = cart.reduce((total, item) => total + (item.product.shippingFee || 0) * item.quantity, 0);
       const finalTotal = (cartTotal * 1.08) + shippingTotal;
+
+      if (paymentMethod === 'wallet') {
+        const currentBalance = userData.walletBalance || 0;
+        if (currentBalance < finalTotal) {
+          setSuccessModal({ isOpen: true, message: `Insufficient wallet balance. You have ৳${currentBalance.toFixed(2)}, but need ৳${finalTotal.toFixed(2)}.` });
+          return;
+        }
+        // Deduct from wallet
+        await updateDoc(doc(db, "users", user.uid), {
+          walletBalance: currentBalance - finalTotal
+        });
+      }
 
       await addDoc(collection(db, "orders"), {
         userId: user.uid,
@@ -1232,7 +1251,7 @@ export default function App() {
               </div>
             </div>
             
-            <ProductComments productId={selectedProduct.id} user={user} />
+            <ProductComments productId={selectedProduct.id} user={user} productSellerId={selectedProduct.sellerId} />
           </div>
         )}
 
@@ -1386,11 +1405,12 @@ export default function App() {
                     <h4 className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Payment Method</h4>
                     <select 
                       value={paymentMethod}
-                      onChange={e => setPaymentMethod(e.target.value as 'online' | 'cod')}
+                      onChange={e => setPaymentMethod(e.target.value as 'online' | 'cod' | 'wallet')}
                       className="w-full bg-neutral-900 border border-neutral-800 text-white px-3 py-2 outline-none focus:border-[#D4FF00] font-bold text-sm uppercase tracking-widest"
                     >
                       <option value="cod">Cash on Delivery (COD)</option>
                       <option value="online">Online Payment</option>
+                      <option value="wallet">Store Wallet</option>
                     </select>
                   </div>
 
@@ -1821,34 +1841,14 @@ export default function App() {
         )}
 
         {currentView === "customer-service" && <CustomerService />}
-        {currentView === "profile" && <UserProfile user={user} orders={orders} favorites={favorites} products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} />}
+        {currentView === "profile" && <UserProfile user={user} favorites={favorites} products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} />}
         {currentView === "add-listing" && <AddListing onBack={() => setCurrentView("seller")} productToEdit={editingProduct} />}
         {currentView === "brand" && <BrandStore sellerId={pathParts[2]} products={products} onViewProduct={(id: string) => navigate("/product/" + id)} addToCart={addToCart} toggleFavorite={toggleFavorite} favorites={favorites} />}
         {currentView === "admin" && <AdminDashboard />}
         {currentView === "gift-cards" && <GiftCards user={user} />}
         {currentView === "deals" && <Deals />}
         {currentView === "best-sellers" && <BestSellers products={products} onViewProduct={(id: string) => navigate(`/product/${id}`)} addToCart={addToCart} toggleFavorite={toggleFavorite} favorites={favorites} />}
-        {currentView === "registry" && <Registry />}
-        {["registry"].includes(currentView) && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center animate-in fade-in duration-500">
-            <div className="w-24 h-24 border-2 border-[#D4FF00] flex items-center justify-center mb-8">
-              <Star className="w-10 h-10 text-[#D4FF00]" />
-            </div>
-            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-4">
-              COMING SOON
-            </h1>
-            <p className="text-neutral-400 font-medium max-w-md uppercase tracking-widest text-sm">
-              This section is currently under development. Please check back
-              later.
-            </p>
-            <button
-              onClick={() => setCurrentView("home")}
-              className="mt-12 bg-[#D4FF00] text-black font-black uppercase tracking-widest px-8 py-4 hover:bg-white transition-colors"
-            >
-              RETURN HOME
-            </button>
-          </div>
-        )}
+        {currentView === "registry" && <Registry user={user} onViewProduct={(id: string) => navigate(`/product/${id}`)} />}
       </main>
 
       {/* Mobile Drawer Overlay */}

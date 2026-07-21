@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { collection, onSnapshot, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { User } from 'lucide-react';
 import { Comment } from './App';
 
-export default function ProductComments({ productId, user }: { productId: string, user: any }) {
+export default function ProductComments({ productId, user, productSellerId }: { productId: string, user: any, productSellerId?: string }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [rating, setRating] = useState(5);
   const [loading, setLoading] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
 
   useEffect(() => {
     if (!productId) return;
@@ -22,7 +25,10 @@ export default function ProductComments({ productId, user }: { productId: string
           userId: data.userId,
           userName: data.userName || 'Anonymous',
           text: data.text,
-          createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString()
+          rating: data.rating,
+          replyText: data.replyText,
+          createdAt: data.createdAt?.toDate().toISOString() || new Date().toISOString(),
+          replyAt: data.replyAt?.toDate().toISOString()
         });
       });
       setComments(fbComments);
@@ -40,9 +46,11 @@ export default function ProductComments({ productId, user }: { productId: string
         userId: user.uid,
         userName: user.email,
         text: newComment.trim(),
+        rating,
         createdAt: serverTimestamp()
       });
       setNewComment('');
+      setRating(5);
     } catch (err) {
       console.error(err);
       alert("Failed to post comment");
@@ -50,6 +58,23 @@ export default function ProductComments({ productId, user }: { productId: string
       setLoading(false);
     }
   };
+
+  const handleReply = async (commentId: string) => {
+    if (!replyText.trim()) return;
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, `products/${productId}/comments`, commentId), {
+        replyText: replyText.trim(),
+        replyAt: serverTimestamp()
+      });
+      setReplyingTo(null);
+      setReplyText('');
+    } catch(err) {
+      alert('Failed to reply');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const handleDelete = async (commentId: string) => {
     if (!window.confirm("Are you sure you want to delete this comment?")) return;
@@ -68,6 +93,21 @@ export default function ProductComments({ productId, user }: { productId: string
       {user ? (
         <form onSubmit={handleSubmit} className="mb-12">
           <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-neutral-500 font-bold uppercase tracking-widest text-xs mb-2 block">Rating</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button 
+                    key={star} type="button" 
+                    onClick={() => setRating(star)}
+                    className={`text-2xl ${star <= rating ? 'text-[#D4FF00]' : 'text-neutral-700'}`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -100,6 +140,11 @@ export default function ProductComments({ productId, user }: { productId: string
                 </div>
                 <div>
                   <div className="text-white font-bold text-sm">{comment.userName}</div>
+                  {comment.rating && (
+                    <div className="text-[#D4FF00] text-xs">
+                      {'★'.repeat(comment.rating)}{'☆'.repeat(5 - comment.rating)}
+                    </div>
+                  )}
                   <div className="text-neutral-500 font-mono text-xs">{new Date(comment.createdAt).toLocaleDateString()}</div>
                 </div>
               </div>
@@ -115,6 +160,35 @@ export default function ProductComments({ productId, user }: { productId: string
             <p className="text-neutral-300 font-medium whitespace-pre-wrap leading-relaxed">
               {comment.text}
             </p>
+
+            {comment.replyText && (
+              <div className="mt-4 p-4 bg-black border border-neutral-800 ml-8">
+                <div className="text-[#D4FF00] font-bold text-xs uppercase tracking-widest mb-2">Seller Reply</div>
+                <p className="text-neutral-400 font-medium whitespace-pre-wrap">{comment.replyText}</p>
+              </div>
+            )}
+
+            {user?.uid === productSellerId && !comment.replyText && (
+              <div className="mt-4 text-right">
+                {replyingTo === comment.id ? (
+                  <div className="mt-2 text-left bg-black p-4 border border-neutral-800">
+                    <textarea 
+                      value={replyText} onChange={e => setReplyText(e.target.value)}
+                      className="w-full bg-neutral-900 border-2 border-neutral-800 text-white p-3 focus:border-[#D4FF00] outline-none min-h-[80px]"
+                      placeholder="Write your reply..."
+                    />
+                    <div className="flex justify-end gap-2 mt-2">
+                      <button onClick={() => setReplyingTo(null)} className="text-neutral-500 text-xs font-bold uppercase tracking-widest px-4">Cancel</button>
+                      <button onClick={() => handleReply(comment.id)} disabled={loading} className="bg-[#D4FF00] text-black px-4 py-2 font-bold text-xs uppercase tracking-widest">Reply</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setReplyingTo(comment.id)} className="text-[#D4FF00] text-xs font-bold uppercase tracking-widest underline decoration-[#D4FF00]/30 underline-offset-4">
+                    Reply to user
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {comments.length === 0 && (

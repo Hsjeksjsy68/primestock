@@ -1,0 +1,142 @@
+--- src/Registry.tsx
++++ src/Registry.tsx
+@@ -1,37 +1,114 @@
++import { useState, useEffect } from 'react';
+ import { ClipboardList } from 'lucide-react';
++import { collection, query, where, getDocs, addDoc, doc, updateDoc, arrayRemove } from 'firebase/firestore';
++import { db } from './firebase';
+ 
+-export default function Registry() {
++export default function Registry({ user, onViewProduct }: { user: any, onViewProduct: (id: string) => void }) {
++  const [registries, setRegistries] = useState<any[]>([]);
++  const [newRegName, setNewRegName] = useState('');
++  const [searchId, setSearchId] = useState('');
++  const [searchedRegistry, setSearchedRegistry] = useState<any>(null);
++
++  useEffect(() => {
++    if (user) {
++      fetchRegistries();
++    }
++  }, [user]);
++
++  const fetchRegistries = async () => {
++    const q = query(collection(db, "registries"), where("userId", "==", user.uid));
++    const snap = await getDocs(q);
++    const regs: any[] = [];
++    snap.forEach(doc => regs.push({ id: doc.id, ...doc.data() }));
++    setRegistries(regs);
++  };
++
++  const handleCreate = async () => {
++    if (!user || !newRegName.trim()) return;
++    await addDoc(collection(db, "registries"), {
++      userId: user.uid,
++      userName: user.email,
++      name: newRegName.trim(),
++      items: [],
++      createdAt: new Date().toISOString()
++    });
++    setNewRegName('');
++    fetchRegistries();
++  };
++
++  const handleSearch = async () => {
++    if (!searchId.trim()) return;
++    const q = query(collection(db, "registries"), where("name", "==", searchId.trim()));
++    const snap = await getDocs(q);
++    if (!snap.empty) {
++      setSearchedRegistry({ id: snap.docs[0].id, ...snap.docs[0].data() });
++    } else {
++      alert('Registry not found');
++    }
++  };
++
+   return (
+     <div className="max-w-6xl mx-auto animate-in fade-in duration-500 text-center py-12">
+       <div className="inline-flex items-center justify-center w-24 h-24 border-2 border-[#D4FF00] mb-8">
+         <ClipboardList className="w-10 h-10 text-[#D4FF00]" />
+       </div>
+       
+       <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-4 text-white">
+         GIFT REGISTRY
+       </h1>
+       <p className="text-neutral-400 font-medium max-w-xl mx-auto uppercase tracking-widest text-sm mb-12">
+         Create and manage registries for weddings, birthdays, or special events. Build your wishlist and share it with friends and family.
+       </p>
+ 
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
+         <div className="bg-black border-2 border-neutral-800 p-8">
+           <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-4">Find a Registry</h3>
+-          <input placeholder="Enter name or registry ID" className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 mb-4 focus:border-[#D4FF00] outline-none" />
+-          <button className="w-full bg-white text-black font-black uppercase tracking-widest py-4 hover:bg-[#D4FF00] transition-colors">
++          <input 
++            value={searchId} onChange={e => setSearchId(e.target.value)}
++            placeholder="Enter registry name" 
++            className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 mb-4 focus:border-[#D4FF00] outline-none" 
++          />
++          <button onClick={handleSearch} className="w-full bg-white text-black font-black uppercase tracking-widest py-4 hover:bg-[#D4FF00] transition-colors">
+             Search
+           </button>
++          {searchedRegistry && (
++            <div className="mt-4 p-4 border border-[#D4FF00]">
++              <h4 className="text-[#D4FF00] font-bold uppercase tracking-widest mb-2">{searchedRegistry.name}</h4>
++              <p className="text-sm text-neutral-400 mb-2">By: {searchedRegistry.userName}</p>
++              <div className="space-y-2">
++                {searchedRegistry.items?.map((item: any) => (
++                  <div key={item.id} className="flex justify-between items-center text-sm border-t border-neutral-800 pt-2">
++                    <span onClick={() => onViewProduct(item.id)} className="text-white cursor-pointer hover:text-[#D4FF00]">{item.name}</span>
++                    <span className="text-[#D4FF00]">৳{item.price}</span>
++                  </div>
++                ))}
++              </div>
++            </div>
++          )}
+         </div>
+         
+         <div className="bg-black border-2 border-neutral-800 p-8">
+           <h3 className="text-2xl font-black text-[#D4FF00] uppercase tracking-widest mb-4">Create a Registry</h3>
+-          <p className="text-neutral-500 text-sm mb-6">Sign in to start adding items to your personalized registry.</p>
+-          <button className="w-full bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 hover:bg-white transition-colors">
+-            Get Started
+-          </button>
++          {!user ? (
++            <p className="text-neutral-500 text-sm mb-6">Sign in to start adding items to your personalized registry.</p>
++          ) : (
++            <>
++              <input 
++                value={newRegName} onChange={e => setNewRegName(e.target.value)}
++                placeholder="e.g. John's Birthday" 
++                className="w-full bg-neutral-900 border border-neutral-800 text-white px-4 py-3 mb-4 focus:border-[#D4FF00] outline-none" 
++              />
++              <button onClick={handleCreate} className="w-full bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 hover:bg-white transition-colors">
++                Create Registry
++              </button>
++            </>
++          )}
+         </div>
+       </div>
++
++      {user && registries.length > 0 && (
++        <div className="mt-12 max-w-4xl mx-auto text-left">
++          <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-6">My Registries</h3>
++          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
++            {registries.map(r => (
++              <div key={r.id} className="bg-neutral-900 border border-neutral-800 p-6">
++                <h4 className="text-[#D4FF00] font-black uppercase tracking-widest mb-4">{r.name}</h4>
++                {r.items?.length === 0 ? <p className="text-neutral-500 text-sm">No items yet. Add items from the product page.</p> : (
++                  <div className="space-y-2">
++                    {r.items?.map((item: any) => (
++                      <div key={item.id} className="flex justify-between items-center text-sm border-t border-neutral-800 pt-2">
++                        <span onClick={() => onViewProduct(item.id)} className="text-white cursor-pointer hover:text-[#D4FF00]">{item.name}</span>
++                      </div>
++                    ))}
++                  </div>
++                )}
++              </div>
++            ))}
++          </div>
++        </div>
++      )}
+     </div>
+   );
+ }

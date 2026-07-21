@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Upload, Save } from 'lucide-react';
 import { db } from './firebase';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { compressImage } from "./utils/imageUtils";
 
 export default function SellerSettingsTab({ user, sellerProfile }: { user: any, sellerProfile: any }) {
