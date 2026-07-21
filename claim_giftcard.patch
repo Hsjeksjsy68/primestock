@@ -1,0 +1,97 @@
+--- src/GiftCards.tsx
++++ src/GiftCards.tsx
+@@ -4,6 +4,7 @@
+ import { db } from './firebase';
+-import { collection, addDoc, onSnapshot } from 'firebase/firestore';
++import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+ 
+ export default function GiftCards({ user }: { user: any }) {
+   const [templates, setTemplates] = useState<any[]>([]);
+   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+   const [amount, setAmount] = useState(100);
+   const [loading, setLoading] = useState(false);
+   const [purchasedCode, setPurchasedCode] = useState('');
+   const [error, setError] = useState('');
++  const [claimCode, setClaimCode] = useState('');
++  const [claimLoading, setClaimLoading] = useState(false);
++  const [claimMessage, setClaimMessage] = useState({ text: '', type: '' });
+@@ -47,2 +50,47 @@
+ 
++  const handleClaim = async (e: React.FormEvent) => {
++    e.preventDefault();
++    if (!user) {
++      setClaimMessage({ text: "Please sign in to claim a gift card.", type: 'error' });
++      return;
++    }
++    if (!claimCode.trim()) {
++      setClaimMessage({ text: "Please enter a valid gift card code.", type: 'error' });
++      return;
++    }
++    setClaimLoading(true);
++    setClaimMessage({ text: '', type: '' });
++    try {
++      const q = query(collection(db, 'gift_cards'), where('code', '==', claimCode.trim()));
++      const snapshot = await getDocs(q);
++      
++      if (snapshot.empty) {
++        setClaimMessage({ text: "Invalid gift card code.", type: 'error' });
++        return;
++      }
++      
++      const gcDoc = snapshot.docs[0];
++      const gcData = gcDoc.data();
++      
++      if (gcData.balance <= 0 || gcData.claimedBy) {
++        setClaimMessage({ text: "This gift card has already been claimed or has zero balance.", type: 'error' });
++        return;
++      }
++      
++      // Update user wallet balance
++      const userRef = doc(db, 'users', user.uid);
++      const userSnap = await getDoc(userRef);
++      const currentBalance = userSnap.exists() && userSnap.data().walletBalance ? userSnap.data().walletBalance : 0;
++      
++      await setDoc(userRef, { walletBalance: currentBalance + gcData.balance }, { merge: true });
++      
++      // Update GC doc
++      await updateDoc(doc(db, 'gift_cards', gcDoc.id), { balance: 0, claimedBy: user.uid, claimedAt: new Date().toISOString() });
++      
++      setClaimMessage({ text: `Successfully claimed ৳${gcData.balance} to your wallet!`, type: 'success' });
++      setClaimCode('');
++    } catch (err: any) {
++      setClaimMessage({ text: err.message, type: 'error' });
++    } finally {
++      setClaimLoading(false);
++    }
++  };
++
+   return (
+@@ -107,3 +155,27 @@
+         </div>
+       )}
++
++      <div className="mt-12 bg-black border-2 border-neutral-800 p-8 md:p-12">
++        <h3 className="text-2xl font-black uppercase tracking-tighter text-white mb-6">REDEEM GIFT CARD</h3>
++        {claimMessage.text && (
++          <div className={`p-4 mb-6 font-bold text-sm uppercase tracking-widest ${claimMessage.type === 'error' ? 'bg-red-500/10 border border-red-500 text-red-500' : 'bg-[#D4FF00]/10 border border-[#D4FF00] text-[#D4FF00]'}`}>
++            {claimMessage.text}
++          </div>
++        )}
++        <form onSubmit={handleClaim} className="flex flex-col md:flex-row gap-4">
++          <input 
++            type="text" 
++            value={claimCode}
++            onChange={e => setClaimCode(e.target.value)}
++            placeholder="ENTER GIFT CARD CODE (e.g. GC-XXXXXX)"
++            className="flex-1 bg-neutral-900 border border-neutral-800 text-white px-6 py-4 focus:border-[#D4FF00] outline-none font-bold uppercase tracking-widest"
++          />
++          <button 
++            type="submit"
++            disabled={claimLoading}
++            className="bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 px-12 hover:bg-white transition-colors disabled:opacity-50"
++          >
++            {claimLoading ? 'VERIFYING...' : 'CLAIM NOW'}
++          </button>
++        </form>
++      </div>
+     </div>

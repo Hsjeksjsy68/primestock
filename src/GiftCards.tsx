@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Gift, CheckCircle } from 'lucide-react';
 import { db } from './firebase';
-import { collection, addDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, where, getDocs, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 
 export default function GiftCards({ user }: { user: any }) {
   const [templates, setTemplates] = useState<any[]>([]);
@@ -10,6 +10,10 @@ export default function GiftCards({ user }: { user: any }) {
   const [loading, setLoading] = useState(false);
   const [purchasedCode, setPurchasedCode] = useState('');
   const [error, setError] = useState('');
+
+  const [claimCode, setClaimCode] = useState('');
+  const [claimLoading, setClaimLoading] = useState(false);
+  const [claimMessage, setClaimMessage] = useState({ text: '', type: '' });
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'gift_card_templates'), (snapshot) => {
@@ -57,6 +61,54 @@ export default function GiftCards({ user }: { user: any }) {
     }
   };
 
+  const handleClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      setClaimMessage({ text: "Please sign in to claim a gift card.", type: 'error' });
+      return;
+    }
+    if (!claimCode.trim()) {
+      setClaimMessage({ text: "Please enter a valid gift card code.", type: 'error' });
+      return;
+    }
+
+    setClaimLoading(true);
+    setClaimMessage({ text: '', type: '' });
+
+    try {
+      const q = query(collection(db, 'gift_cards'), where('code', '==', claimCode.trim()));
+      const snapshot = await getDocs(q);
+      
+      if (snapshot.empty) {
+        setClaimMessage({ text: "Invalid gift card code.", type: 'error' });
+        return;
+      }
+      
+      const gcDoc = snapshot.docs[0];
+      const gcData = gcDoc.data();
+      
+      if (gcData.balance <= 0 || gcData.claimedBy) {
+        setClaimMessage({ text: "This gift card has already been claimed or has zero balance.", type: 'error' });
+        return;
+      }
+      
+      const userRef = doc(db, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+      const currentBalance = userSnap.exists() && userSnap.data().walletBalance ? userSnap.data().walletBalance : 0;
+      
+      await setDoc(userRef, { walletBalance: currentBalance + gcData.balance }, { merge: true });
+      
+      await updateDoc(doc(db, 'gift_cards', gcDoc.id), { balance: 0, claimedBy: user.uid, claimedAt: new Date().toISOString() });
+      
+      setClaimMessage({ text: `Successfully claimed ৳${gcData.balance} to your wallet!`, type: 'success' });
+      setClaimCode('');
+    } catch (err: any) {
+      setClaimMessage({ text: err.message, type: 'error' });
+    } finally {
+      setClaimLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
       <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-8 text-white flex items-center gap-4">
@@ -64,14 +116,14 @@ export default function GiftCards({ user }: { user: any }) {
       </h1>
 
       {purchasedCode ? (
-        <div className="bg-[#D4FF00]/10 border-2 border-[#D4FF00] p-8 md:p-12 text-center">
+        <div className="bg-[#D4FF00]/10 border-2 border-[#D4FF00] p-8 md:p-12 text-center mb-12">
           <CheckCircle className="w-16 h-16 text-[#D4FF00] mx-auto mb-6" />
           <h2 className="text-2xl font-black text-white uppercase mb-2">Purchase Successful</h2>
           <p className="text-neutral-400 font-bold uppercase tracking-widest text-sm mb-8">Your digital gift card code is ready.</p>
           <div className="bg-black border border-[#D4FF00] py-6 px-4 inline-block mx-auto mb-8 min-w-[250px]">
             <div className="text-3xl font-mono text-[#D4FF00] font-bold tracking-widest">{purchasedCode}</div>
           </div>
-          <p className="text-neutral-500 italic">Please save this code. It can be used during checkout.</p>
+          <p className="text-neutral-500 italic">Please save this code. It can be used during checkout or claimed to your wallet.</p>
           <button 
             onClick={() => setPurchasedCode('')}
             className="mt-8 bg-[#D4FF00] text-black font-black uppercase tracking-widest px-8 py-3 hover:bg-white transition-colors"
@@ -80,7 +132,7 @@ export default function GiftCards({ user }: { user: any }) {
           </button>
         </div>
       ) : (
-        <div className="bg-black border-2 border-neutral-800 p-8 md:p-12 flex flex-col md:flex-row gap-8 items-center">
+        <div className="bg-black border-2 border-neutral-800 p-8 md:p-12 flex flex-col md:flex-row gap-8 items-center mb-12">
           <div className="flex-1 w-full aspect-video bg-neutral-900 flex items-center justify-center border border-neutral-800 relative overflow-hidden">
             {selectedTemplate && selectedTemplate.imageUrl ? (
               <img src={selectedTemplate.imageUrl} alt={selectedTemplate.name} className="absolute inset-0 w-full h-full object-cover mix-blend-luminosity opacity-40" />
@@ -132,6 +184,35 @@ export default function GiftCards({ user }: { user: any }) {
           </div>
         </div>
       )}
+
+      {/* Claim Section */}
+      <div className="bg-black border-2 border-neutral-800 p-8 md:p-12">
+        <h3 className="text-2xl font-black uppercase tracking-tighter text-white mb-6">REDEEM GIFT CARD</h3>
+        <p className="text-neutral-400 font-medium text-sm mb-6">Enter your gift card code below to add the balance to your store wallet.</p>
+        
+        {claimMessage.text && (
+          <div className={`p-4 mb-6 font-bold text-sm uppercase tracking-widest ${claimMessage.type === 'error' ? 'bg-red-500/10 border border-red-500 text-red-500' : 'bg-[#D4FF00]/10 border border-[#D4FF00] text-[#D4FF00]'}`}>
+            {claimMessage.text}
+          </div>
+        )}
+
+        <form onSubmit={handleClaim} className="flex flex-col md:flex-row gap-4">
+          <input 
+            type="text" 
+            value={claimCode}
+            onChange={e => setClaimCode(e.target.value)}
+            placeholder="ENTER GIFT CARD CODE (e.g. GC-XXXXXX)"
+            className="flex-1 bg-neutral-900 border border-neutral-800 text-white px-6 py-4 focus:border-[#D4FF00] outline-none font-bold uppercase tracking-widest"
+          />
+          <button 
+            type="submit"
+            disabled={claimLoading}
+            className="bg-[#D4FF00] text-black font-black uppercase tracking-widest py-4 px-12 hover:bg-white transition-colors disabled:opacity-50"
+          >
+            {claimLoading ? 'VERIFYING...' : 'CLAIM NOW'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

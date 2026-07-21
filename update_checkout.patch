@@ -1,0 +1,95 @@
+--- src/App.tsx
++++ src/App.tsx
+@@ -341,20 +341,24 @@
+   const placeOrder = async () => {
+     if (!user) {
+       setIsAuthModalOpen(true);
+       return;
+     }
+     if (cart.length === 0) return;
+     
+     try {
+       const userDoc = await getDoc(doc(db, "users", user.uid));
+       const userData = userDoc.exists() ? userDoc.data() : {};
+       
+       if (!userData.address) {
+         setSuccessModal({ isOpen: true, message: "Please add a shipping address in your profile first." });
+         return;
+       }
++
++      const shippingTotal = cart.reduce((total, item) => total + (item.product.shippingFee || 0) * item.quantity, 0);
++      const finalTotal = (cartTotal * 1.08) + shippingTotal;
+       
+       await addDoc(collection(db, "orders"), {
+         userId: user.uid,
+         userEmail: user.email,
+         customerName: userData.name || 'Unknown',
+         customerPhone: userData.phone || 'Unknown',
+         shippingAddress: userData.address,
+         items: cart,
+-        total: cartTotal * 1.08,
++        total: finalTotal,
++        paymentMethod: paymentMethod,
+         status: "pending",
+         createdAt: new Date().toISOString(),
+       });
+       setCart([]);
+       setSuccessModal({ isOpen: true, message: "Order placed successfully!" });
+       setCurrentView("home");
+@@ -1349,30 +1353,49 @@
+                   <h3 className="font-bold text-lg mb-4 text-neutral-100">
+                     Order Summary
+                   </h3>
+                   <div className="space-y-3 text-sm text-neutral-400 mb-6">
+                     <div className="flex justify-between">
+                       <span>Items ({cartItemCount}):</span>
+                       <span className="text-neutral-200">
+                         ৳{cartTotal.toFixed(2)}
+                       </span>
+                     </div>
+                     <div className="flex justify-between">
+                       <span>Shipping & handling:</span>
+-                      <span className="text-green-500 font-medium">Free</span>
++                      <span className="text-neutral-200 font-medium">
++                        {cart.reduce((total, item) => total + (item.product.shippingFee || 0) * item.quantity, 0) === 0 ? <span className="text-green-500 font-medium">Free</span> : `৳${cart.reduce((total, item) => total + (item.product.shippingFee || 0) * item.quantity, 0).toFixed(2)}`}
++                      </span>
+                     </div>
+                     <div className="flex justify-between">
+                       <span>Total before tax:</span>
+                       <span className="text-neutral-200">
+                         ৳{cartTotal.toFixed(2)}
+                       </span>
+                     </div>
+                     <div className="flex justify-between">
+                       <span>Estimated tax (8%):</span>
+                       <span className="text-neutral-200">
+                         ৳{(cartTotal * 0.08).toFixed(2)}
+                       </span>
+                     </div>
+                   </div>
+                   <div className="border-t border-neutral-800 pt-4 mb-6">
+                     <div className="flex justify-between items-center mb-1">
+                       <span className="font-bold text-lg text-neutral-100">
+                         Order Total:
+                       </span>
+                       <span className="font-black text-2xl text-neutral-100">
+-                        ৳{(cartTotal * 1.08).toFixed(2)}
++                        ৳{((cartTotal * 1.08) + cart.reduce((total, item) => total + (item.product.shippingFee || 0) * item.quantity, 0)).toFixed(2)}
+                       </span>
+                     </div>
+                   </div>
++                  
++                  <div className="mb-6">
++                    <h4 className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Payment Method</h4>
++                    <select 
++                      value={paymentMethod}
++                      onChange={e => setPaymentMethod(e.target.value as 'online' | 'cod')}
++                      className="w-full bg-neutral-900 border border-neutral-800 text-white px-3 py-2 outline-none focus:border-[#D4FF00] font-bold text-sm uppercase tracking-widest"
++                    >
++                      <option value="cod">Cash on Delivery (COD)</option>
++                      <option value="online">Online Payment</option>
++                    </select>
++                  </div>
++
+                   {user && (
+                     <div className="bg-neutral-900 border border-neutral-800 p-4 mb-6">
